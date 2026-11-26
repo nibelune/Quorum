@@ -18,6 +18,7 @@ Ce document décrit le *comment*. Le *pourquoi* des choix est dans `docs/adr/`.
               (comptes, quiz, résultats)  (parties en cours)
 ```
 
+- En production (Railway, ADR 0012), le point d'entrée public de Railway termine le HTTPS devant Caddy.
 - **web** (SvelteKit) est rendu côté client (ADR 0011) : le navigateur appelle directement l'API et le WebSocket, à travers Caddy.
 - **api** gère les comptes, les quiz et la création des parties. Il écrit l'état initial d'une partie dans Redis et délivre les jetons animateur.
 - **realtime** gère tout le reste du cycle de vie d'une partie. Il ne parle qu'à Redis, jamais à Postgres.
@@ -90,7 +91,7 @@ Si `protocolVersion` ne correspond pas, le serveur répond `reload` : le client 
 - Format du jeton : `base64url(payload).base64url(HMAC-SHA256)`, signé et vérifié par `@quorum/protocol/token` (réservé à Node). Un jeton animateur expiré est redemandé à l'API à la reconnexion.
 - Secret HMAC partagé entre `api` et `realtime` via la variable d'environnement `SESSION_SECRET`.
 - Upgrade WebSocket refusé si l'en-tête `Origin` ne correspond pas à `PUBLIC_ORIGIN`.
-- Rate limit par connexion (20 messages/s, fermeture avec le code 1008 au-delà) et par IP pour les PIN inconnus : au-delà de 10 `lookup` ou `join` visant un PIN inexistant en une minute, les suivants sont refusés (compteur Redis). Tester les PIN un par un reste impraticable, alors qu'une salle entière derrière une même IP (le Wi-Fi d'un bar) peut rejoindre. L'IP est lue dans `X-Forwarded-For`, posé par Caddy uniquement.
+- Rate limit par connexion (20 messages/s, fermeture avec le code 1008 au-delà) et par IP pour les PIN inconnus : au-delà de 10 `lookup` ou `join` visant un PIN inexistant en une minute, les suivants sont refusés (compteur Redis). Tester les PIN un par un reste impraticable, alors qu'une salle entière derrière une même IP (le Wi-Fi d'un bar) peut rejoindre. L'IP est lue dans `X-Real-IP`, toujours posé par Caddy : en dev, c'est l'adresse de la connexion ; en production, celle que pose le point d'entrée de Railway (ADR 0012).
 - Les commandes animateur sont refusées pour un jeton `player`.
 
 ## Multi-serveurs : un écrivain unique par partie

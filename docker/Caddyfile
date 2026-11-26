@@ -1,20 +1,33 @@
-:8080 {
-	handle /api/* {
-		reverse_proxy api:3000
+# Le même fichier sert en dev (Compose) et en prod (Railway) : seules les variables d'environnement changent.
+{
+	servers {
+		# En prod, le point d'entrée de Railway pose X-Real-IP : Caddy n'est joignable qu'à travers lui.
+		# En dev, aucune valeur reçue n'est crue : l'IP du client est celle de la connexion.
+		trusted_proxies static {$TRUSTED_PROXIES:127.0.0.1/32}
+		client_ip_headers X-Real-IP
 	}
-	# Les répliques de realtime sont relues dans le DNS de Docker : un nœud redémarré reçoit à nouveau du trafic.
+}
+
+:{$PORT:8080} {
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM:api:3000} {
+			header_up X-Real-IP {client_ip}
+		}
+	}
+	# Les répliques de realtime sont relues dans le DNS : un nœud redémarré reçoit à nouveau du trafic.
 	handle /ws {
 		reverse_proxy {
 			dynamic a {
-				name realtime
+				name {$REALTIME_HOST:realtime}
 				port 3000
 				refresh 1s
 			}
+			header_up X-Real-IP {client_ip}
 			lb_policy least_conn
 			lb_try_duration 5s
 		}
 	}
 	handle {
-		reverse_proxy web:3000
+		reverse_proxy {$WEB_UPSTREAM:web:3000}
 	}
 }

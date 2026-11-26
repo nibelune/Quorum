@@ -62,11 +62,10 @@ export function handleConnection(node: Node, socket: WebSocket, request: Incomin
   });
 }
 
-// L'IP vient de X-Forwarded-For, posé par Caddy : realtime n'est joignable qu'à travers lui.
+// X-Real-IP est toujours posé par Caddy, et realtime n'est joignable qu'à travers lui.
 function clientIp(request: IncomingMessage): string {
-  const forwarded = request.headers["x-forwarded-for"];
-  const last = (Array.isArray(forwarded) ? forwarded.join(",") : forwarded)?.split(",").at(-1)?.trim();
-  return last ?? request.socket.remoteAddress ?? "inconnue";
+  const realIp = request.headers["x-real-ip"];
+  return (Array.isArray(realIp) ? realIp[0] : realIp) ?? request.socket.remoteAddress ?? "inconnue";
 }
 
 async function handleMessage(node: Node, client: Client, data: RawData): Promise<void> {

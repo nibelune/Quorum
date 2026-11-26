@@ -26,4 +26,5 @@ app.addHook("onClose", async () => {
 });
 process.once("SIGTERM", () => void app.close());
 
-await app.listen({ host: "0.0.0.0", port: 3000 });
+// IPv4 et IPv6 : le réseau privé de Railway peut joindre le service par l'une ou l'autre.
+await app.listen({ host: "::", port: 3000 });
