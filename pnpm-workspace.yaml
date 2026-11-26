@@ -6,3 +6,7 @@ supportedArchitectures:
   os: [current, linux]
   cpu: [current, arm64]
   libc: [current, glibc]
+
+# Le binaire d'esbuild (via drizzle-kit) arrive par ses dépendances optionnelles : son script d'installation est inutile.
+allowBuilds:
+  esbuild: false

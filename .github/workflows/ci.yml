@@ -11,6 +11,15 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quorum
+          POSTGRES_PASSWORD: quorum
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -h 127.0.0.1 -U quorum" --health-interval 2s
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -20,3 +29,6 @@ jobs:
           cache: pnpm
       - run: pnpm install
       - run: pnpm turbo run lint typecheck test
+      - run: node packages/db/src/migrate.ts
+        env:
+          DATABASE_URL: postgres://quorum:quorum@localhost:5432/quorum

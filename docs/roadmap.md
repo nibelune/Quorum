@@ -10,8 +10,8 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 - [x] CI GitHub Actions : lint, typecheck, test
 - [x] `packages/protocol` : messages WebSocket
 - [x] `packages/game-engine` : `reduce`, `project`, `snapshot`, scores. Chaque transition et chaque règle testées.
-- [ ] `packages/db` + service `migrate` : utilisateurs, quiz, questions
-- [ ] `api` : auth animateur (Better Auth, email + mot de passe), CRUD quiz (QCM, vrai/faux), création de partie + PIN, jeton animateur, schémas HTTP dans `packages/protocol`. Premier service applicatif du Compose : `dev.Dockerfile`, Caddy, `.env.example`
+- [x] `packages/db` : quiz (questions en `jsonb`, ADR 0009), migrations Drizzle, script `migrate` exécuté en CI
+- [ ] `api` : auth animateur (Better Auth, email + mot de passe), CRUD quiz (QCM, vrai/faux), création de partie + PIN, jeton animateur, tables Better Auth (utilisateurs) et clé étrangère `quizzes.owner_id`, schémas HTTP dans `packages/protocol`. Premiers services applicatifs du Compose : `migrate`, `dev.Dockerfile`, Caddy, `.env.example`
 - [ ] `realtime` : connexion, `hello`, `join`, jetons, chemin commande -> coordinateur -> événements, renvoi des erreurs de `reduce` à l'expéditeur, chrono (`tick`), rate limits
 - [ ] `web` : dashboard (liste et édition des quiz), écran projeté (lobby avec QR code, question, révélation, classement, podium), app joueur
 - [ ] E2E Playwright : un animateur et trois joueurs jouent une partie complète

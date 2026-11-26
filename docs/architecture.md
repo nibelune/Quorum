@@ -20,6 +20,7 @@ Ce document décrit le *comment*. Le *pourquoi* des choix est dans `docs/adr/`.
 
 - **api** gère les comptes, les quiz et la création des parties. Il écrit l'état initial d'une partie dans Redis et délivre les jetons animateur.
 - **realtime** gère tout le reste du cycle de vie d'une partie. Il ne parle qu'à Redis, jamais à Postgres.
+- **Postgres** contient les comptes et les quiz. Les questions d'un quiz sont stockées dans une colonne `jsonb` de la table `quizzes` (ADR 0009).
 
 ## Déroulé d'une partie
 
