@@ -80,5 +80,18 @@ services:
       - realtime
       - web
 
+  # make e2e : l'image officielle de Playwright, à la même version que la dépendance. Elle partage le réseau de Caddy,
+  # pour que le navigateur de test atteigne l'app sur la même origine que PUBLIC_ORIGIN.
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.65.1-noble
+    profiles: [e2e]
+    network_mode: service:caddy
+    working_dir: /app/apps/web
+    volumes:
+      - .:/app
+    environment:
+      BASE_URL: ${PUBLIC_ORIGIN:-http://localhost:8080}
+    command: node_modules/.bin/playwright test --config tests/playwright.config.ts
+
 volumes:
   postgres-data:

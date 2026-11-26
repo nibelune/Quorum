@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "@quorum/config": "workspace:*",
     "@sveltejs/adapter-node": "5.5.8",
     "@sveltejs/kit": "2.70.4",

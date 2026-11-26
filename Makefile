@@ -1,4 +1,4 @@
-.PHONY: up down logs
+.PHONY: up down logs e2e
 
 up:
 	docker compose up --wait
@@ -8,3 +8,6 @@ down:
 
 logs:
 	docker compose logs -f
+
+e2e:
+	docker compose --profile e2e run --rm e2e

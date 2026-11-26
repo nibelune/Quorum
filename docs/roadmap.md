@@ -14,7 +14,7 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 - [x] `api` : auth animateur (Better Auth, email + mot de passe), CRUD quiz (QCM, vrai/faux), création de partie + PIN, jeton animateur, tables Better Auth (utilisateurs) et clé étrangère `quizzes.owner_id`, schémas HTTP dans `packages/protocol`. Premiers services applicatifs du Compose : `migrate`, `api`, Caddy, `.env.example`
 - [x] `realtime` : connexion, `hello`, `join`, jetons, chemin commande -> coordinateur -> événements, renvoi des erreurs de `reduce` à l'expéditeur (Pub/Sub, ADR 0010), chrono (`tick`), rate limits
 - [x] `web` : dashboard (liste et édition des quiz), écran projeté (lobby avec QR code, question, révélation, classement, podium), app joueur
-- [ ] E2E Playwright : un animateur et trois joueurs jouent une partie complète
+- [x] E2E Playwright : un animateur et trois joueurs jouent une partie complète
 
 ## Phase 2 : multi-serveurs
 
