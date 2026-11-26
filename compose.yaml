@@ -54,6 +54,8 @@ services:
   realtime:
     <<: *node
     command: node --watch apps/realtime/src/main.ts
+    deploy:
+      replicas: 3
     depends_on:
       redis:
         condition: service_healthy

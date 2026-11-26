@@ -2,8 +2,17 @@
 	handle /api/* {
 		reverse_proxy api:3000
 	}
+	# Les répliques de realtime sont relues dans le DNS de Docker : un nœud redémarré reçoit à nouveau du trafic.
 	handle /ws {
-		reverse_proxy realtime:3000
+		reverse_proxy {
+			dynamic a {
+				name realtime
+				port 3000
+				refresh 1s
+			}
+			lb_policy least_conn
+			lb_try_duration 5s
+		}
 	}
 	handle {
 		reverse_proxy web:3000

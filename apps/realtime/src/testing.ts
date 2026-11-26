@@ -43,6 +43,7 @@ export async function startTestNode({ leaseMs = 600 } = {}) {
     advanceClock(ms: number) {
       offset += ms;
     },
+    shutdown: () => node.shutdown(),
     async close() {
       await node.close();
       redis.disconnect();

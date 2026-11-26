@@ -25,7 +25,7 @@ node.server.listen(3000, () => {
   logger.info("realtime à l'écoute sur le port 3000");
 });
 process.once("SIGTERM", () => {
-  void node.close().then(() => {
+  void node.shutdown().then(() => {
     redis.disconnect();
   });
 });

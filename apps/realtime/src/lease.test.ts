@@ -10,8 +10,8 @@ afterEach(async () => {
   await Promise.all(nodes.splice(0).map((node) => node.close()));
 });
 
-async function start(): Promise<TestNode> {
-  const node = await startTestNode();
+async function start(options?: { leaseMs: number }): Promise<TestNode> {
+  const node = await startTestNode(options);
   nodes.push(node);
   return node;
 }
@@ -76,4 +76,21 @@ test("un nœud qui a perdu le lease n'écrit plus rien, puis reprend quand il se
 
   await player.receive("question_started");
   expect(await leaseOf(a, gameId)).toMatch(new RegExp(`^${a.nodeId}:`));
+});
+
+test("à l'arrêt progressif, le nœud ferme ses sockets avec le code 1012 et relâche aussitôt ses leases", async () => {
+  // Un lease long : sans relâchement, b attendrait 5 s son expiration et le test dépasserait ses délais.
+  const a = await start({ leaseMs: 5000 });
+  const b = await start({ leaseMs: 5000 });
+  const { gameId, pin, hostToken } = await createTestGame(a.redis);
+  const watcher = await connectHost(a.url, hostToken);
+  await waitFor(async () => (await leaseOf(a, gameId))?.startsWith(a.nodeId) ?? false);
+  const host = await connectHost(b.url, hostToken);
+  const { player } = await joinAs(b.url, pin, "Alice");
+
+  await a.shutdown();
+  expect(await watcher.closed).toBe(1012);
+  host.send({ type: "start" });
+  await player.receive("question_started");
+  expect(await leaseOf(b, gameId)).toMatch(new RegExp(`^${b.nodeId}:`));
 });

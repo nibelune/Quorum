@@ -137,14 +137,20 @@ export function dropCoordination(game: LocalGame, reason: string): void {
   game.log.info(reason);
 }
 
-// Plus aucun client ici : le nœud cesse de servir la partie et relâche son lease, qu'un autre nœud peut reprendre aussitôt.
+// Relâché seulement si le token correspond : un autre nœud peut reprendre la partie aussitôt, sans attendre l'expiration.
+export async function releaseLease(node: Node, game: LocalGame): Promise<void> {
+  const lease = game.coordination?.lease;
+  dropCoordination(game, "lease relâché");
+  if (lease) await node.deps.redis.eval(RELEASE_SCRIPT, 1, keys(game.id).lease, lease);
+}
+
+// Plus aucun client ici : le nœud cesse de servir la partie.
 export async function release(node: Node, game: LocalGame): Promise<void> {
   const joining = [...node.clients.values()].some((client) => client.joining?.gameId === game.id);
   if (game.clients.size > 0 || joining) return;
   node.games.delete(game.id);
-  const lease = game.coordination?.lease;
-  dropCoordination(game, "partie libérée");
-  if (lease) await node.deps.redis.eval(RELEASE_SCRIPT, 1, keys(game.id).lease, lease);
+  game.log.info("partie libérée");
+  await releaseLease(node, game);
 }
 
 export async function localGames(node: Node): Promise<LocalGame[]> {
