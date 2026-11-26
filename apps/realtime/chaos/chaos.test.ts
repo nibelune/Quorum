@@ -137,13 +137,16 @@ test("la partie se termine normalement quand on tue son coordinateur en pleine q
   for (const player of players) await player.receive("welcome");
 
   host.send({ type: "start" });
-  for (const player of players) await player.receive("question_started");
+  let shown: string[] = [];
+  for (const player of players) shown = (await player.receive("question_started")).choices;
+  // L'API a mélangé les choix : la bonne réponse à « 2 + 2 = 4 » se retrouve par son texte.
+  const correctIndex = shown.indexOf("Vrai");
   const coordinator = await coordinatorOf(gameId);
   execFileSync("docker", ["kill", coordinator]);
   killed.push(coordinator);
 
   // Les réponses arrivent pendant la panne : le nouveau coordinateur les applique une fois le lease repris.
-  for (const player of players) player.send({ type: "answer", questionId: first.id, choiceIndex: 0 });
+  for (const player of players) player.send({ type: "answer", questionId: first.id, choiceIndex: correctIndex });
   for (const player of players) expect((await player.receive("question_ended")).you?.points).toBeGreaterThan(0);
   await host.receive("question_ended");
   expect(await coordinatorOf(gameId)).not.toBe(coordinator);
