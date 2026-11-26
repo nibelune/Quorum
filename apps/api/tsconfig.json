@@ -1,0 +1,3 @@
+{
+  "extends": "@quorum/config/tsconfig.node.json"
+}

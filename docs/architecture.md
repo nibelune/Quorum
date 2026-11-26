@@ -85,7 +85,8 @@ Si `protocolVersion` ne correspond pas, le serveur répond `reload` : le client 
 ## Identité et sécurité
 
 - **Joueur** : au `join`, le nœud génère un `playerId` et un jeton HMAC (`node:crypto`) contenant `{ gameId, playerId, teamId?, role: "player" }`. L'équipe étant fixée au `join`, elle peut figurer dans le jeton. Le client le garde en `sessionStorage` et le renvoie dans `hello` à chaque reconnexion.
-- **Animateur** : l'écran `/host/[gameId]` demande à l'API un jeton `role: "host"`, à courte durée de vie (`POST /games/:id/host-token`, authentifié par la session Better Auth et réservé au propriétaire de la partie). `realtime` vérifie seulement la signature, sans accès à la base.
+- **Animateur** : l'écran `/host/[gameId]` demande à l'API un jeton `role: "host"`, valable 15 minutes (`POST /api/games/:id/host-token`, authentifié par la session Better Auth et réservé au propriétaire de la partie). `realtime` vérifie seulement la signature, sans accès à la base.
+- Format du jeton : `base64url(payload).base64url(HMAC-SHA256)`, signé et vérifié par `@quorum/protocol/token` (réservé à Node). Un jeton animateur expiré est redemandé à l'API à la reconnexion.
 - Secret HMAC partagé entre `api` et `realtime` via la variable d'environnement `SESSION_SECRET`.
 - Upgrade WebSocket refusé si l'en-tête `Origin` ne correspond pas à `PUBLIC_ORIGIN`.
 - Rate limit par connexion (20 messages/s, fermeture avec le code 1008 au-delà) et par IP pour les `lookup` et les `join` (10/min au total, compteur Redis). Il empêche de tester les PIN un par un. L'IP est lue dans `X-Forwarded-For`, posé par Caddy uniquement.
@@ -142,6 +143,7 @@ Les clients se reconnectent sur un autre nœud et reprennent via `lastSeq`.
 
 ```
 pin:{pin}               -> gameId                         TTL
+game:{id}:owner         id de l'animateur propriétaire    (écrit par api, lu pour le jeton animateur)
 game:{id}:state         état JSON, validé par zod à la lecture
 game:{id}:commands      stream des commandes entrantes
 game:{id}:events        stream des événements, ID = {seq}-0, MAXLEN ~1000
