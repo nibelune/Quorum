@@ -1,59 +1,14 @@
-import { type Browser, expect, type Page, test } from "@playwright/test";
-
-async function newPage(browser: Browser): Promise<Page> {
-  const context = await browser.newContext();
-  return context.newPage();
-}
-
-// Chaque joueur répond dans l'ordre : le plus rapide gagne le plus de points.
-async function answer(answers: [Page, string][]): Promise<void> {
-  for (const [player, choice] of answers) await player.getByRole("button", { name: choice, exact: true }).click();
-}
+import { expect, test } from "@playwright/test";
+import { answer, createQuiz, joinGame, launchGame, newPage, signUpHost } from "./helpers.ts";
 
 test("un animateur et trois joueurs jouent une partie complète", async ({ browser }) => {
   const host = await newPage(browser);
-
-  await test.step("l'animateur crée son compte", async () => {
-    await host.goto("/login");
-    await host.getByRole("button", { name: "Pas encore de compte ? En créer un" }).click();
-    await host.getByLabel("Nom").fill("Camille");
-    await host.getByLabel("Email").fill(`e2e-${String(Date.now())}@quorum.test`);
-    await host.getByLabel("Mot de passe").fill("un-mot-de-passe-solide");
-    await host.getByRole("button", { name: "Créer le compte" }).click();
-    await expect(host.getByRole("heading", { name: "Mes quiz" })).toBeVisible();
-  });
-
-  await test.step("il crée un quiz avec un QCM et un vrai/faux", async () => {
-    await host.getByRole("link", { name: "Nouveau quiz" }).click();
-    await host.getByLabel("Titre").fill("Géographie");
-    const first = host.getByRole("group", { name: "Question 1" });
-    await first.getByLabel("Énoncé").fill("Quelle est la capitale de l'Australie ?");
-    for (const [index, city] of ["Sydney", "Canberra", "Melbourne", "Perth"].entries()) {
-      await first.getByLabel(`Choix ${String(index + 1)}`, { exact: true }).fill(city);
-    }
-    await first.getByLabel("Bonne réponse").nth(1).check();
-    await host.getByRole("button", { name: "Ajouter un vrai/faux" }).click();
-    const second = host.getByRole("group", { name: "Question 2" });
-    await second.getByLabel("Énoncé").fill("La Terre est plate.");
-    await second.getByLabel("Bonne réponse").nth(1).check();
-    await host.getByRole("button", { name: "Enregistrer" }).click();
-    await expect(host.getByRole("heading", { name: "Géographie" })).toBeVisible();
-  });
-
-  await host.getByRole("button", { name: "Lancer", exact: true }).click();
-  const pin = (await host.getByText(/^\d{6}$/).textContent()) ?? "";
+  await signUpHost(host);
+  await createQuiz(host);
+  const pin = await launchGame(host);
 
   const [alice, bob, chloe] = await test.step("trois joueurs rejoignent avec le PIN", () =>
-    Promise.all(
-      ["Alice", "Bob", "Chloé"].map(async (nickname) => {
-        const player = await newPage(browser);
-        await player.goto(`/play?pin=${pin}`);
-        await player.getByLabel("Pseudo").fill(nickname);
-        await player.getByRole("button", { name: "Rejoindre" }).click();
-        await expect(player.getByText("tu es dans la partie")).toBeVisible();
-        return player;
-      }),
-    ),
+    Promise.all(["Alice", "Bob", "Chloé"].map((nickname) => joinGame(browser, pin, nickname))),
   );
   if (!alice || !bob || !chloe) throw new Error("Il manque un joueur");
   await expect(host.getByRole("heading", { name: "3 joueurs" })).toBeVisible();

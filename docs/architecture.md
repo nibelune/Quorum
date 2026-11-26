@@ -127,6 +127,8 @@ Le chrono passe par le même chemin : pendant une question, le coordinateur ajou
 
 - Côté client : reconnexion avec un délai qui double à chaque tentative (250 ms au départ, 5 s maximum), plus une part d'aléatoire.
 - `hello { token, lastSeq }` : le nœud envoie les événements à partir de `lastSeq + 1`. S'ils ne sont plus dans le stream, il envoie un `snapshot` à la place.
+- Le nœud garde pour chaque client la position du dernier événement envoyé, et seule la boucle de diffusion lui envoie des événements. Un client en retard (reconnexion, ou `snapshot` lu pendant une diffusion) est rattrapé par `XRANGE`, dans l'ordre et sans trou.
+- Pendant une reconnexion, les écrans désactivent leurs boutons. L'écran projeté redemande un jeton animateur à l'API si le sien a expiré.
 
 ### Chrono synchronisé
 

@@ -66,6 +66,7 @@ type Message<T extends ServerMessage["type"]> = Extract<ServerMessage, { type: T
 export interface TestClient {
   send: (message: object) => void;
   receive: <T extends ServerMessage["type"]>(type: T) => Promise<Message<T>>;
+  pending: () => ServerMessage[];
   closed: Promise<number>;
   close: () => void;
 }
@@ -111,6 +112,7 @@ export async function connect(url: string, headers: Record<string, string> = {})
       socket.send(JSON.stringify(message));
     },
     receive,
+    pending: () => [...inbox],
     closed,
     close: () => {
       socket.close();

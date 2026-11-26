@@ -35,6 +35,7 @@ export function handleConnection(node: Node, socket: WebSocket, request: Incomin
     identity: undefined,
     joining: undefined,
     window: { start: deps.now(), count: 0 },
+    position: 0,
     queue: Promise.resolve(),
   };
   node.clients.set(id, client);
@@ -89,7 +90,7 @@ async function handleMessage(node: Node, client: Client, data: RawData): Promise
       client.helloed = true;
       if (message.token === undefined) return;
       const payload = verifyToken(message.token, deps.sessionSecret, now);
-      if (payload) await attach(node, client, payload);
+      if (payload) await attach(node, client, payload, message.lastSeq);
       else fail(client, "invalid_token");
       return;
     }
@@ -164,7 +165,7 @@ export async function handleReply(node: Node, { connId, result }: Reply): Promis
   await attach(node, client, { role: "player", ...joining });
 }
 
-async function attach(node: Node, client: Client, identity: Identity): Promise<void> {
+async function attach(node: Node, client: Client, identity: Identity, lastSeq?: number): Promise<void> {
   const game = await ensureGame(node, identity.gameId);
   if (!game) {
     fail(client, "game_not_found");
@@ -173,14 +174,21 @@ async function attach(node: Node, client: Client, identity: Identity): Promise<v
   const recipient = recipientOf(identity);
   client.identity = identity;
   client.log = client.log.child(recipient.role === "player" ? { gameId: game.id, playerId: recipient.playerId } : { gameId: game.id });
-  // Ajoutée avant la lecture de l'état : aucun événement postérieur au snapshot ne peut lui échapper.
-  game.clients.set(client, recipient);
+  if (lastSeq !== undefined) {
+    // Reconnexion : la diffusion lui renvoie les événements manqués, ou un snapshot s'ils ont été purgés du stream.
+    client.position = lastSeq;
+    game.clients.set(client, recipient);
+    return;
+  }
   const state = await currentState(node.deps, game);
   if (!state) {
     fail(client, "game_not_found");
     return;
   }
+  // Les événements diffusés pendant la lecture de l'état seront rattrapés à partir de cette position.
   const message = snapshot(state, recipient);
+  client.position = state.seq;
+  game.clients.set(client, recipient);
   send(client, message);
   if (message.type === "error") client.socket.close();
 }

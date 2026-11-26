@@ -52,6 +52,7 @@
     <p class="screen">{errorMessage("kicked")}</p>
   {:else if view}
     {@const stage = view.stage}
+    {#if game?.status === "reconnecting"}<p class="banner" role="status">Connexion perdue, reconnexion…</p>{/if}
     <header>
       <strong>{view.nickname}</strong>
       {#if stage.phase === "question"}<Countdown deadline={stage.question.deadline} />{/if}
@@ -68,6 +69,7 @@
           {#each stage.question.choices as choice, index (index)}
             <button
               style:--color="var(--choice-{index})"
+              disabled={game?.status !== "open"}
               onclick={() => {
                 answer(index);
               }}
@@ -210,5 +212,14 @@
 
   .error {
     text-align: center;
+  }
+
+  .banner {
+    position: fixed;
+    inset: 0 0 auto;
+    margin: 0;
+    padding: 0.5rem;
+    text-align: center;
+    background: var(--accent);
   }
 </style>

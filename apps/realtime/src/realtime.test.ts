@@ -1,5 +1,6 @@
 import { PROTOCOL_VERSION } from "@quorum/protocol";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { keys } from "./games.ts";
 import { connect, connectHost, createTestGame, joinAs, question, startTestNode } from "./testing.ts";
 
 let node: Awaited<ReturnType<typeof startTestNode>>;
@@ -146,5 +147,34 @@ describe("partie", () => {
     host.send({ type: "kick", playerId });
     expect(await player.receive("error")).toEqual({ type: "error", code: "kicked" });
     await player.closed;
+  });
+});
+
+describe("reconnexion", () => {
+  test("un client qui revient avec lastSeq reçoit les événements manqués, sans snapshot", async () => {
+    const { pin, hostToken } = await createTestGame(node.redis);
+    const host = await connectHost(node.url, hostToken);
+    await joinAs(node.url, pin, "Alice");
+    expect(await host.receive("player_joined")).toMatchObject({ seq: 1 });
+    host.close();
+    await joinAs(node.url, pin, "Bob");
+
+    const again = await connect(node.url);
+    again.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, token: hostToken, lastSeq: 1 });
+    expect(await again.receive("player_joined")).toMatchObject({ seq: 2, nickname: "Bob" });
+    expect(again.pending().map(({ type }) => type)).not.toContain("snapshot");
+  });
+
+  test("si les événements manqués ont été purgés du stream, le client reçoit un snapshot", async () => {
+    const { gameId, pin, hostToken } = await createTestGame(node.redis);
+    await joinAs(node.url, pin, "Alice");
+    await joinAs(node.url, pin, "Bob");
+    await node.redis.xtrim(keys(gameId).events, "MINID", "3-0");
+
+    const host = await connect(node.url);
+    host.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, token: hostToken, lastSeq: 0 });
+    const { seq, view } = await host.receive("snapshot");
+    expect(seq).toBe(2);
+    expect(view).toMatchObject({ players: [{ nickname: "Alice" }, { nickname: "Bob" }] });
   });
 });

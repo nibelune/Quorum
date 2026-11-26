@@ -20,7 +20,7 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 
 - [x] Lease, fencing token, reprise par un autre nœud
 - [x] `realtime` à 3 répliques dans le Compose, arrêt progressif (`SIGTERM`, code 1012)
-- [ ] Reconnexion client avec backoff, rejeu par `lastSeq`, repli sur `snapshot`
+- [x] Reconnexion client avec backoff, rejeu par `lastSeq`, repli sur `snapshot`
 - [ ] `make chaos` : test automatisé qui tue un nœud en pleine partie et vérifie que la partie se termine normalement
 - [ ] Synchronisation d'horloge par `ping`/`pong`
 - [ ] Mise en ligne sur Railway (un Dockerfile par app, HTTPS, `realtime` en 3 répliques) : première démo en ligne

@@ -3,7 +3,7 @@ import { Command, GameState, type Recipient } from "@quorum/game-engine";
 import { ErrorCode, type GameId, type PlayerId, type ServerMessage } from "@quorum/protocol";
 import type { Redis } from "ioredis";
 import type { Logger } from "pino";
-import type { WebSocket } from "ws";
+import { WebSocket } from "ws";
 import { z } from "zod";
 
 export const GAME_TTL_SECONDS = 2 * 60 * 60;
@@ -33,6 +33,8 @@ export interface Client {
   identity: Identity | undefined;
   joining: { gameId: GameId; playerId: PlayerId } | undefined;
   window: { start: number; count: number };
+  // Dernier événement envoyé à ce client : la diffusion lui envoie la suite, dans l'ordre et sans trou.
+  position: number;
   // Les messages d'une connexion sont traités un par un, dans l'ordre d'arrivée.
   queue: Promise<void>;
 }
@@ -90,7 +92,7 @@ export function parseJson(text: string | undefined): unknown {
 }
 
 export function send(client: Client, message: ServerMessage): void {
-  client.socket.send(JSON.stringify(message));
+  if (client.socket.readyState === WebSocket.OPEN) client.socket.send(JSON.stringify(message));
 }
 
 export function recipientOf(identity: Identity): Recipient {

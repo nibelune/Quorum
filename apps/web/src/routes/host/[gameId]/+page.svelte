@@ -16,9 +16,10 @@
   let game = $state<GameConnection | null>(null);
   let failed = $state(false);
 
-  api(HostToken, `/games/${gameId}/host-token`, { method: "POST" })
-    .then(({ token }) => {
-      game = new GameConnection({ token });
+  const fetchToken = async () => (await api(HostToken, `/games/${gameId}/host-token`, { method: "POST" })).token;
+  fetchToken()
+    .then((token) => {
+      game = new GameConnection({ token, refreshToken: fetchToken });
     })
     .catch(() => {
       failed = true;
@@ -55,6 +56,7 @@
     <p class="notice">Connexion…</p>
   {:else}
     {@const stage = view.stage}
+    {#if game?.status === "reconnecting"}<p class="banner" role="status">Connexion perdue, reconnexion…</p>{/if}
     {#if stage.phase === "lobby"}
       <section class="lobby">
         <div class="join">
@@ -84,7 +86,7 @@
           </ul>
           <button
             class="primary big"
-            disabled={view.players.length === 0}
+            disabled={view.players.length === 0 || game?.status !== "open"}
             onclick={() => {
               send({ type: "start" });
             }}>Lancer la partie</button
@@ -116,6 +118,7 @@
           {#if stage.phase === "question"}
             <p>{stage.answerCount ?? 0} / {view.players.length} réponses</p>
             <button
+              disabled={game?.status !== "open"}
               onclick={() => {
                 send({ type: "next" });
               }}>Arrêter la question</button
@@ -123,6 +126,7 @@
           {:else}
             <button
               class="primary big"
+              disabled={game?.status !== "open"}
               onclick={() => {
                 send({ type: "next" });
               }}>Classement</button
@@ -136,6 +140,7 @@
         <Standings standings={stage.top} />
         <button
           class="primary big"
+          disabled={game?.status !== "open"}
           onclick={() => {
             send({ type: "next" });
           }}>Suivant</button
@@ -318,6 +323,16 @@
   .error {
     color: var(--accent);
     text-align: center;
+  }
+
+  .banner {
+    position: fixed;
+    inset: 0 0 auto;
+    margin: 0;
+    padding: 0.5rem;
+    text-align: center;
+    background: var(--accent);
+    color: var(--ink);
   }
 
   .end {
