@@ -90,7 +90,7 @@ Si `protocolVersion` ne correspond pas, le serveur répond `reload` : le client 
 - Format du jeton : `base64url(payload).base64url(HMAC-SHA256)`, signé et vérifié par `@quorum/protocol/token` (réservé à Node). Un jeton animateur expiré est redemandé à l'API à la reconnexion.
 - Secret HMAC partagé entre `api` et `realtime` via la variable d'environnement `SESSION_SECRET`.
 - Upgrade WebSocket refusé si l'en-tête `Origin` ne correspond pas à `PUBLIC_ORIGIN`.
-- Rate limit par connexion (20 messages/s, fermeture avec le code 1008 au-delà) et par IP pour les `lookup` et les `join` (10/min au total, compteur Redis). Il empêche de tester les PIN un par un. L'IP est lue dans `X-Forwarded-For`, posé par Caddy uniquement.
+- Rate limit par connexion (20 messages/s, fermeture avec le code 1008 au-delà) et par IP pour les PIN inconnus : au-delà de 10 `lookup` ou `join` visant un PIN inexistant en une minute, les suivants sont refusés (compteur Redis). Tester les PIN un par un reste impraticable, alors qu'une salle entière derrière une même IP (le Wi-Fi d'un bar) peut rejoindre. L'IP est lue dans `X-Forwarded-For`, posé par Caddy uniquement.
 - Les commandes animateur sont refusées pour un jeton `player`.
 
 ## Multi-serveurs : un écrivain unique par partie
@@ -152,7 +152,7 @@ game:{id}:events        stream des événements, ID = {seq}-0, MAXLEN ~1000
 game:{id}:lease         {nodeId}:{token}, PX 5000
 game:{id}:fence         compteur de fencing tokens
 node:{nodeId}:replies   canal Pub/Sub des réponses individuelles (refus, join accepté)
-ratelimit:join:{ip}     compteur, TTL 60 s
+ratelimit:join:{ip}     compteur de PIN inconnus, TTL 60 s
 ```
 
 Toutes les clés d'une partie ont un TTL de 2 h, renouvelé à chaque `commit`.

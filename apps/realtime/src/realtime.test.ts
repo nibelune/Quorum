@@ -67,12 +67,18 @@ describe("join", () => {
     expect(await second.receive("error")).toEqual({ type: "error", code: "nickname_taken" });
   });
 
-  test("au-delà de 10 join par minute depuis une même IP, les suivants sont refusés", async () => {
+  test("au-delà de 10 PIN inconnus par minute depuis une même IP, les join suivants sont refusés", async () => {
     const client = await connect(node.url, { "x-forwarded-for": `10.0.0.${String(Math.floor(Math.random() * 250))}` });
     client.send({ type: "hello", protocolVersion: PROTOCOL_VERSION });
     for (let i = 0; i < 11; i++) client.send({ type: "join", pin: "999999", nickname: "Alice" });
     for (let i = 0; i < 10; i++) expect(await client.receive("error")).toEqual({ type: "error", code: "game_not_found" });
     expect(await client.receive("error")).toEqual({ type: "error", code: "rate_limited" });
+  });
+
+  test("toute une salle derrière une même IP peut rejoindre", async () => {
+    const { pin } = await createTestGame(node.redis);
+    const ip = { "x-forwarded-for": `10.1.0.${String(Math.floor(Math.random() * 250))}` };
+    for (let i = 0; i < 12; i++) await joinAs(node.url, pin, `Joueur ${String(i)}`, ip);
   });
 
   test("un joueur se reconnecte avec son jeton", async () => {

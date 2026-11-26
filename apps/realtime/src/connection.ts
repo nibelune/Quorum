@@ -18,7 +18,9 @@ import {
 } from "./games.ts";
 
 const MESSAGES_PER_SECOND = 20;
-const JOINS_PER_MINUTE = 10;
+// Seuls les PIN inconnus comptent : une salle entière peut rejoindre depuis une même IP (le Wi-Fi d'un bar),
+// mais tester les PIN un par un reste impraticable.
+const UNKNOWN_PINS_PER_MINUTE = 10;
 
 export function handleConnection(node: Node, socket: WebSocket, request: IncomingMessage): void {
   const { deps } = node;
@@ -96,15 +98,15 @@ async function handleMessage(node: Node, client: Client, data: RawData): Promise
         return;
       }
       const limitKey = `ratelimit:join:${client.ip}`;
-      const attempts = await deps.redis.incr(limitKey);
-      await deps.redis.expire(limitKey, 60, "NX");
-      if (attempts > JOINS_PER_MINUTE) {
+      if (Number(await deps.redis.get(limitKey)) >= UNKNOWN_PINS_PER_MINUTE) {
         fail(client, "rate_limited");
         return;
       }
       const gameId = GameId.safeParse(await deps.redis.get(`pin:${message.pin}`));
       const game = gameId.success ? await ensureGame(node, gameId.data) : null;
       if (!game) {
+        await deps.redis.incr(limitKey);
+        await deps.redis.expire(limitKey, 60, "NX");
         fail(client, "game_not_found");
         return;
       }
