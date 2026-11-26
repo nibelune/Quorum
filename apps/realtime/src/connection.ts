@@ -94,6 +94,9 @@ async function handleMessage(node: Node, client: Client, data: RawData): Promise
       else fail(client, "invalid_token");
       return;
     }
+    case "ping":
+      send(client, { type: "pong", t: message.t, serverTime: now });
+      return;
     case "join": {
       if (identity || client.joining) {
         fail(client, "forbidden");

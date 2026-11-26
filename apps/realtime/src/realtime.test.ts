@@ -33,6 +33,16 @@ describe("connexion", () => {
     expect(await client.receive("error")).toEqual({ type: "error", code: "invalid_token" });
   });
 
+  test("répond à un ping avec l'heure du serveur, pour la synchronisation d'horloge", async () => {
+    const client = await connect(node.url);
+    client.send({ type: "hello", protocolVersion: PROTOCOL_VERSION });
+    const before = Date.now();
+    client.send({ type: "ping", t: 42 });
+    const { t, serverTime } = await client.receive("pong");
+    expect(t).toBe(42);
+    expect(serverTime).toBeGreaterThanOrEqual(before);
+  });
+
   test("ferme la connexion au-delà de 20 messages par seconde", async () => {
     const client = await connect(node.url);
     for (let i = 0; i < 21; i++) client.send({ type: "hello", protocolVersion: PROTOCOL_VERSION });

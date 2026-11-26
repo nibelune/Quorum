@@ -22,7 +22,7 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 - [x] `realtime` à 3 répliques dans le Compose, arrêt progressif (`SIGTERM`, code 1012)
 - [x] Reconnexion client avec backoff, rejeu par `lastSeq`, repli sur `snapshot`
 - [x] `make chaos` : test automatisé qui tue un nœud en pleine partie et vérifie que la partie se termine normalement
-- [ ] Synchronisation d'horloge par `ping`/`pong`
+- [x] Synchronisation d'horloge par `ping`/`pong`
 - [ ] Mise en ligne sur Railway (un Dockerfile par app, HTTPS, `realtime` en 3 répliques) : première démo en ligne
 - [ ] Mode équipes : moteur (équipes, capitaine, score d'équipe), protocole (`lookup`, `team_answer_locked`...), écrans (choix de l'équipe au `join`, choix du capitaine visible par l'équipe, classement par équipes), e2e avec deux équipes
 

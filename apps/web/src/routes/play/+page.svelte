@@ -55,7 +55,7 @@
     {#if game?.status === "reconnecting"}<p class="banner" role="status">Connexion perdue, reconnexion…</p>{/if}
     <header>
       <strong>{view.nickname}</strong>
-      {#if stage.phase === "question"}<Countdown deadline={stage.question.deadline} />{/if}
+      {#if stage.phase === "question"}<Countdown deadline={stage.question.deadline} offset={game?.clockOffset ?? 0} />{/if}
     </header>
 
     {#if stage.phase === "lobby"}

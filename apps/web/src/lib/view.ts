@@ -51,6 +51,7 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
     case "game_ended":
       return { seq, view: { ...view, stage: { phase: "ended", podium: message.podium } } };
     case "welcome":
+    case "pong":
     case "reload":
       return state;
   }

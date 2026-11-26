@@ -1,12 +1,13 @@
 <script lang="ts">
-  // L'échéance est absolue : chaque écran calcule le temps restant avec sa propre horloge (synchronisée en phase 2).
+  // L'échéance est absolue, à l'heure du serveur : `offset` corrige l'écart avec l'horloge de cet appareil.
   interface Props {
     deadline: number;
+    offset: number;
   }
 
-  let { deadline }: Props = $props();
+  let { deadline, offset }: Props = $props();
   let now = $state(Date.now());
-  let remaining = $derived(Math.max(0, Math.ceil((deadline - now) / 1000)));
+  let remaining = $derived(Math.max(0, Math.ceil((deadline - now - offset) / 1000)));
 
   $effect(() => {
     const timer = setInterval(() => {

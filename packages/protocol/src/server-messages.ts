@@ -74,6 +74,7 @@ export const ServerMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("welcome"), token: z.string() }),
   z.object({ type: z.literal("snapshot"), seq: Seq, view: View }),
   z.object({ type: z.literal("answer_received") }),
+  z.object({ type: z.literal("pong"), t: z.number(), serverTime: z.number() }),
   z.object({ type: z.literal("error"), code: ErrorCode }),
   z.object({ type: z.literal("reload") }),
 ]);

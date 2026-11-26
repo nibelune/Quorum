@@ -12,6 +12,8 @@ export const ClientMessage = z.discriminatedUnion("type", [
     // Reconnexion : dernier événement reçu. Le serveur renvoie la suite, ou un snapshot si elle n'est plus dans le stream.
     lastSeq: z.int().nonnegative().optional(),
   }),
+  // Synchronisation d'horloge : t est l'heure du client à l'envoi, renvoyée telle quelle dans le pong.
+  z.object({ type: z.literal("ping"), t: z.number() }),
   z.object({ type: z.literal("join"), pin: Pin, nickname: Nickname }),
   z.object({ type: z.literal("answer"), questionId: QuestionId, choiceIndex: ChoiceIndex }),
   z.object({ type: z.literal("start") }),

@@ -1,5 +1,8 @@
 import { type ClientMessage, type ErrorCode, PROTOCOL_VERSION, ServerMessage } from "@quorum/protocol";
+import { clockOffset, offsetSample } from "./clock.ts";
 import { reduceView, type View } from "./view.ts";
+
+const CLOCK_SAMPLES = 5;
 
 interface Options {
   token?: string | undefined;
@@ -16,6 +19,9 @@ export class GameConnection {
   view: View | null = $state.raw(null);
   status: "connecting" | "open" | "reconnecting" | "closed" | "kicked" = $state("connecting");
   error: ErrorCode | null = $state(null);
+  // Écart avec l'horloge du serveur : les comptes à rebours s'alignent sur ses échéances absolues.
+  clockOffset = $state(0);
+  #clockSamples: number[] = [];
   #seq = 0;
   #token: string | undefined;
   // Une réponse envoyée juste avant une coupure peut se perdre : sans accusé de réception, elle est renvoyée après la reconnexion.
@@ -52,6 +58,8 @@ export class GameConnection {
       this.#attempt = 0;
       this.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, token: this.#token, lastSeq: this.view ? this.#seq : undefined });
       if (this.#pendingAnswer) socket.send(this.#pendingAnswer);
+      this.#clockSamples = [];
+      this.#ping();
       if (first) this.#options.onOpen?.(this);
     });
     socket.addEventListener("message", (event) => {
@@ -82,9 +90,21 @@ export class GameConnection {
       this.#token = message.token;
       this.#options.onWelcome?.(message.token);
     }
+    if (message.type === "pong") this.#measure(message.t, message.serverTime);
     if (message.type === "answer_received" || message.type === "question_ended") this.#pendingAnswer = null;
     if (message.type === "error") this.#fail(message.code);
     ({ view: this.view, seq: this.#seq } = reduceView({ view: this.view, seq: this.#seq }, message));
+  }
+
+  #ping(): void {
+    const ping: ClientMessage = { type: "ping", t: Date.now() };
+    this.#socket.send(JSON.stringify(ping));
+  }
+
+  #measure(sentAt: number, serverTime: number): void {
+    this.#clockSamples.push(offsetSample(sentAt, Date.now(), serverTime));
+    if (this.#clockSamples.length < CLOCK_SAMPLES) this.#ping();
+    else this.clockOffset = clockOffset(this.#clockSamples);
   }
 
   #fail(code: ErrorCode): void {

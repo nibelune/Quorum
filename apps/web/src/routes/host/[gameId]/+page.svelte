@@ -97,7 +97,7 @@
       <section class="question">
         <header>
           <h1>{stage.question.text}</h1>
-          {#if stage.phase === "question"}<Countdown deadline={stage.question.deadline} />{/if}
+          {#if stage.phase === "question"}<Countdown deadline={stage.question.deadline} offset={game?.clockOffset ?? 0} />{/if}
         </header>
         <ul class="choices">
           {#each stage.question.choices as choice, index (index)}
