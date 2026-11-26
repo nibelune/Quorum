@@ -5,6 +5,7 @@
   import Standings from "$lib/Standings.svelte";
   import { GameConnection } from "$lib/game.svelte";
   import { errorMessage } from "$lib/messages";
+  import { playerChoices } from "$lib/order";
   import type { ErrorCode, TeamChoice } from "@quorum/protocol";
   import { onDestroy } from "svelte";
 
@@ -89,17 +90,19 @@
         </p>
       {/if}
     {:else if stage.phase === "question"}
+      <!-- L'ordre propre à ce téléphone : formes et couleurs suivent la position, pas la réponse. -->
+      {@const choices = playerChoices(stage.question.choices, `${stage.question.questionId}:${view.nickname}`)}
       {#if !captain}
         <p class="text">{stage.question.text}</p>
         <ul class="answers">
-          {#each stage.question.choices as choice, index (index)}
+          {#each choices as { index, text }, position (index)}
             {@const locked = stage.teamAnswer !== undefined}
             <li
-              style:--color="var(--choice-{index})"
+              style:--color="var(--choice-{position})"
               class={{ picked: stage.teamAnswer === index, faded: locked && stage.teamAnswer !== index }}
             >
-              <ChoiceShape {index} size="2.5rem" />
-              <span>{choice}</span>
+              <ChoiceShape index={position} size="2.5rem" />
+              <span>{text}</span>
               {#if stage.teamAnswer === index}<strong class="pick">Choix de l'équipe</strong>{/if}
             </li>
           {/each}
@@ -113,16 +116,16 @@
       {:else}
         <p class="text">{stage.question.text}</p>
         <div class="answers">
-          {#each stage.question.choices as choice, index (index)}
+          {#each choices as { index, text }, position (index)}
             <button
-              style:--color="var(--choice-{index})"
+              style:--color="var(--choice-{position})"
               disabled={game?.status !== "open"}
               onclick={() => {
                 answer(index);
               }}
             >
-              <ChoiceShape {index} size="2.5rem" />
-              <span>{choice}</span>
+              <ChoiceShape index={position} size="2.5rem" />
+              <span>{text}</span>
             </button>
           {/each}
         </div>

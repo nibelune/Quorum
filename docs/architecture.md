@@ -30,8 +30,8 @@ Ce document décrit le *comment*. Le *pourquoi* des choix est dans `docs/adr/`.
 Phases : `lobby` -> `question` -> `reveal` -> `leaderboard` -> (question suivante ou) `ended`
 
 - Une question a un énoncé (300 caractères max), 2 à 4 choix (120 caractères max), une seule bonne réponse, une durée de 5 à 300 s et, au besoin, une image (JPEG, PNG ou WebP, 2 Mo max, ADR 0013). Une question vrai/faux est un QCM à deux choix.
-- Les choix de chaque question sont mélangés une fois, à la création de la partie : l'écran projeté et les téléphones les montrent dans le même ordre, une forme et une couleur par position.
-- Pendant une question, l'écran projeté consacre ses deux tiers du haut à l'énoncé, posé sur l'image, et son tiers du bas aux réponses, en 2 × 2. Les téléphones reprennent la même grille, sans l'image.
+- Les choix de chaque question sont mélangés une fois, à la création de la partie : l'ordre de l'auteur ne se retrouve pas à l'écran. Chaque téléphone les présente en plus dans son propre ordre, tiré de la question et du pseudo, pour qu'un joueur le retrouve après une reconnexion : dans une salle, « la troisième réponse » ou « le triangle bleu » ne désigne pas la même réponse pour tous. Sur chaque écran, formes et couleurs suivent la position, et le joueur répond d'après le texte.
+- Pendant une question, l'écran projeté consacre ses deux tiers du haut à l'énoncé, posé sur l'image, et son tiers du bas aux réponses, en 2 × 2. Les téléphones reprennent une grille 2 × 2, sans l'image.
 - L'animateur crée une partie depuis le dashboard et choisit le mode : `solo` ou `teams`. Un PIN à 6 chiffres et un QR code s'affichent sur l'écran projeté.
 - Les joueurs rejoignent avec un pseudo (1 à 20 caractères, unique dans la partie sans tenir compte de la casse). On peut rejoindre jusqu'à la fin de la partie : un retardataire commence à 0 point.
 - L'animateur peut exclure un joueur : celui-ci est prévenu (`error { code: "kicked" }`) et ne peut plus répondre.
