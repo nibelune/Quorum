@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+supportedArchitectures:
+  os: [current, linux]
+  cpu: [current, arm64]
+  libc: [current, glibc]
