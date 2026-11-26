@@ -98,10 +98,11 @@ Chaque partie a un **coordinateur** : le seul nœud qui applique les commandes e
 
 ### Cycle d'une commande
 
-1. Un client envoie un message à n'importe quel nœud. Le nœud le valide (zod, jeton, rate limit), l'horodate (`at = Date.now()`) et l'ajoute au stream `game:{id}:commands`.
+1. Un client envoie un message à n'importe quel nœud. Le nœud le valide (zod, jeton, rate limit), l'horodate (`at = Date.now()`) et l'ajoute au stream `game:{id}:commands`, avec l'adresse de la connexion qui l'a reçu (`nodeId`, `connId`). Les messages d'une connexion sont traités un par un, dans l'ordre d'arrivée.
 2. Pour une réponse, le nœud renvoie aussitôt `answer_received`. Ça confirme la réception, pas la validité.
-3. Le coordinateur lit les commandes, appelle `reduce`, puis exécute le script Lua générique `commit` (aucune logique métier) : il vérifie que le lease porte toujours son token, écrit le nouvel état (qui contient l'id de la dernière commande traitée) et ajoute les événements au stream `game:{id}:events`, le tout de façon atomique.
+3. Le coordinateur lit les commandes par lots, appelle `reduce` pour chacune, puis exécute le script Lua générique `commit` (aucune logique métier) : il vérifie que le lease porte toujours son token, écrit le nouvel état, ajoute les événements au stream `game:{id}:events` et supprime les commandes appliquées (`XTRIM MINID`), le tout de façon atomique. Le stream de commandes ne contient donc que des commandes en attente (ADR 0010).
 4. Chaque nœud lit les streams d'événements des parties dont il sert au moins un client. Pour chaque socket locale, il applique `project` et envoie le résultat.
+5. Un refus de `reduce` (`nickname_taken`, `too_late`...) et un `join` accepté appellent une réponse individuelle. Après le `commit`, le coordinateur la publie sur `node:{nodeId}:replies`, le canal Pub/Sub du nœud qui a reçu la commande (ADR 0010). Ce nœud envoie `error` à la socket, ou `welcome` puis `snapshot` pour un `join`.
 
 Seule exception, `lookup` est une lecture : il ne passe pas par le coordinateur. Le nœud lit l'état dans Redis et répond avec la vue `visitor` (mode et équipes, rien d'autre).
 
@@ -110,15 +111,15 @@ Le chrono passe par le même chemin : pendant une question, le coordinateur ajou
 ### Coordinateur et lease
 
 - Le lease `game:{id}:lease` vaut `{nodeId}:{token}` et expire au bout de 5 s (`SET NX PX`). Il est renouvelé toutes les 1,5 s. Le token provient de `INCR game:{id}:fence` (fencing token).
-- Tout nœud qui sert un client d'une partie sans coordinateur tente d'acquérir le lease. Le gagnant charge l'état, applique les commandes postérieures à la dernière traitée, puis reprend les `tick`.
+- Tout nœud qui sert un client d'une partie sans coordinateur tente d'acquérir le lease. Le gagnant charge l'état, applique les commandes restées dans le stream, puis reprend les `tick`.
 - Un ancien coordinateur (pause GC, coupure réseau) ne peut plus rien écrire : `commit` rejette son token.
-- Après chaque `commit`, les commandes traitées sont supprimées (`XTRIM MINID`).
 
 ### Diffusion
 
 - L'ID d'une entrée du stream d'événements est `{seq}-0`, ce qui permet un `XRANGE` direct par numéro de séquence. Le stream est plafonné à environ 1000 entrées (`MAXLEN ~`).
 - Chaque nœud a une seule boucle `XREAD BLOCK` (200 ms) sur les streams de ses parties actives. Ce délai court permet d'intégrer une nouvelle partie sans connexion Redis supplémentaire.
 - Pas de tempête de messages : la liste des joueurs ne va qu'à l'écran animateur, et `answer_count` n'est émis qu'au `tick`, au plus toutes les 250 ms.
+- Le client ignore un message dont le `seq` est inférieur ou égal au dernier reçu : juste après un `snapshot`, une socket peut recevoir des événements que celui-ci contient déjà.
 
 ### Reconnexion
 
@@ -149,6 +150,7 @@ game:{id}:commands      stream des commandes entrantes
 game:{id}:events        stream des événements, ID = {seq}-0, MAXLEN ~1000
 game:{id}:lease         {nodeId}:{token}, PX 5000
 game:{id}:fence         compteur de fencing tokens
+node:{nodeId}:replies   canal Pub/Sub des réponses individuelles (refus, join accepté)
 ratelimit:join:{ip}     compteur, TTL 60 s
 ```
 

@@ -51,6 +51,16 @@ services:
       test: [CMD, node, -e, "fetch('http://localhost:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 2s
 
+  realtime:
+    <<: *node
+    command: node --watch apps/realtime/src/main.ts
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 2s
+
   caddy:
     image: caddy:2
     ports:
@@ -59,6 +69,7 @@ services:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - api
+      - realtime
 
 volumes:
   postgres-data:

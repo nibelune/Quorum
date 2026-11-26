@@ -70,6 +70,34 @@ importers:
         specifier: workspace:*
         version: link:../../packages/config
 
+  apps/realtime:
+    dependencies:
+      '@quorum/game-engine':
+        specifier: workspace:*
+        version: link:../../packages/game-engine
+      '@quorum/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      ioredis:
+        specifier: 5.11.1
+        version: 5.11.1
+      pino:
+        specifier: 10.4.0
+        version: 10.4.0
+      ws:
+        specifier: 8.23.0
+        version: 8.23.0
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@quorum/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/ws':
+        specifier: 8.18.2
+        version: 8.18.2
+
   packages/config: {}
 
   packages/db:
@@ -944,6 +972,9 @@ packages:
 
   '@types/pg@8.23.1':
     resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
+
+  '@types/ws@8.18.2':
+    resolution: {integrity: sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==}
 
   '@typescript-eslint/eslint-plugin@8.74.0':
     resolution: {integrity: sha512-z3KXk1+Vm+d82ZRplOoC89ho4Rf1da5ju6sx8//92GnN532U62DGPjECXkkVqtYzIv0zoJlpO39SX2Z9tk6LVw==}
@@ -2003,6 +2034,18 @@ packages:
     resolution: {integrity: sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA==}
     engines: {node: '>=0.10.0'}
 
+  ws@8.23.0:
+    resolution: {integrity: sha512-wCkmX8QMOrKjgO8HW2WyDbTSGeqkocxgDzS9iR79rEAexty6/2qzilx3Ag8Tqf9ykop3irLKle0MtVn5qjVnoQ==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
@@ -2550,6 +2593,10 @@ snapshots:
       '@types/node': 24.19.4
       pg-protocol: 1.16.1
       pg-types: 2.2.0
+
+  '@types/ws@8.18.2':
+    dependencies:
+      '@types/node': 24.19.4
 
   '@typescript-eslint/eslint-plugin@8.74.0(@typescript-eslint/parser@8.74.0(eslint@10.15.0)(typescript@6.0.3))(eslint@10.15.0)(typescript@6.0.3)':
     dependencies:
@@ -3524,6 +3571,8 @@ snapshots:
       stackback: 0.0.2
 
   word-wrap@1.2.5: {}
+
+  ws@8.23.0: {}
 
   xtend@4.0.2: {}
 

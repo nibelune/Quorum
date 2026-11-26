@@ -19,6 +19,6 @@ Option 2. Les nœuds ajoutent les commandes à `game:{id}:commands`. Le coordina
 ## Conséquences
 
 - Toute la logique reste dans `game-engine`. Le seul script Lua (`commit`) est générique.
-- L'état mémorise la dernière commande traitée, donc la reprise par un autre coordinateur est exacte : rien n'est perdu ni appliqué deux fois.
+- Le `commit` supprime atomiquement les commandes qu'il applique (ADR 0010), donc la reprise par un autre coordinateur est exacte : rien n'est perdu ni appliqué deux fois.
 - Le passage par Redis ajoute quelques millisecondes de latence. C'est négligeable pour un quiz, et l'accusé de réception est envoyé directement par le nœud qui reçoit la commande.
 - Le débit d'une partie est limité par un seul nœud, ce qui reste très largement suffisant pour quelques milliers de joueurs.
