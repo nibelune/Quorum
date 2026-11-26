@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GameId, GameMode, Pin, Question, QuestionContent, QuestionId, QuizId } from "./domain.ts";
+import { GameId, GameMode, ImageUrl, Pin, Question, QuestionContent, QuestionId, QuizId } from "./domain.ts";
 
 const Title = z.string().trim().min(1).max(120);
 
@@ -26,3 +26,5 @@ export const CreateGameInput = z.object({ quizId: QuizId, mode: GameMode });
 export const CreatedGame = z.object({ gameId: GameId, pin: Pin });
 
 export const HostToken = z.object({ token: z.string() });
+
+export const UploadedImage = z.object({ url: ImageUrl });

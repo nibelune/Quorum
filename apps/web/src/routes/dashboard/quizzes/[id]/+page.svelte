@@ -4,7 +4,7 @@
   import { page } from "$app/state";
   import ChoiceShape from "$lib/ChoiceShape.svelte";
   import { api } from "$lib/api";
-  import { MAX_CHOICES, Quiz, QuizInput } from "@quorum/protocol";
+  import { MAX_CHOICES, MAX_IMAGE_BYTES, Quiz, QuizInput, UploadedImage } from "@quorum/protocol";
   import { z } from "zod";
 
   type DraftQuestion = QuizInput["questions"][number];
@@ -39,6 +39,21 @@
     else if (index === question.correctIndex) question.correctIndex = 0;
   }
 
+  async function upload(question: DraftQuestion, input: HTMLInputElement) {
+    const file = input.files?.[0];
+    if (!file) return;
+    error = "";
+    if (file.size > MAX_IMAGE_BYTES) {
+      error = "Image trop lourde : 2 Mo au plus.";
+      return;
+    }
+    try {
+      question.imageUrl = (await api(UploadedImage, "/images", { method: "POST", body: file })).url;
+    } catch {
+      error = "L'envoi de l'image a échoué : JPEG, PNG ou WebP uniquement.";
+    }
+  }
+
   async function save(event: SubmitEvent) {
     event.preventDefault();
     const parsed = QuizInput.safeParse(draft);
@@ -71,6 +86,29 @@
       <fieldset>
         <legend>Question {q + 1}</legend>
         <label>Énoncé <textarea bind:value={question.text} required maxlength="300" rows="2"></textarea></label>
+
+        <div class="image">
+          {#if question.imageUrl}
+            <img src={question.imageUrl} alt="Image de la question {q + 1}" />
+            <button
+              type="button"
+              onclick={() => {
+                question.imageUrl = undefined;
+              }}>Retirer l'image</button
+            >
+          {:else}
+            <label>
+              Image (facultative : JPEG, PNG ou WebP, 2 Mo au plus)
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onchange={(event) => {
+                  void upload(question, event.currentTarget);
+                }}
+              />
+            </label>
+          {/if}
+        </div>
 
         <ol>
           {#each question.choices, c}
@@ -199,6 +237,20 @@
 
   .duration {
     width: 8rem;
+  }
+
+  .image {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.75rem;
+  }
+
+  .image img {
+    max-width: 12rem;
+    max-height: 8rem;
+    border-radius: var(--radius);
+    object-fit: cover;
   }
 
   .error {

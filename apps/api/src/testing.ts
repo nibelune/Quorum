@@ -1,4 +1,5 @@
 import { createDb } from "@quorum/db";
+import { AwsClient } from "aws4fetch";
 import { Redis } from "ioredis";
 import { buildApp } from "./app.ts";
 import { createAuth } from "./auth.ts";
@@ -6,6 +7,11 @@ import { createAuth } from "./auth.ts";
 export const TEST_DATABASE_URL = "postgres://quorum:quorum@localhost:5432/quorum_test";
 export const TEST_REDIS_URL = "redis://localhost:6379/1";
 export const TEST_SECRET = "secret-de-test-".padEnd(32, "x");
+// Le serveur S3 local du Compose, qui accepte n'importe quelles clés.
+const TEST_STORAGE = {
+  client: new AwsClient({ accessKeyId: "test", secretAccessKey: "test", region: "us-east-1", service: "s3" }),
+  bucketUrl: "http://localhost:9090/quorum",
+};
 
 export type TestApp = ReturnType<typeof buildApp>;
 
@@ -13,7 +19,7 @@ export function testApp(): TestApp {
   const db = createDb(TEST_DATABASE_URL);
   const redis = new Redis(TEST_REDIS_URL);
   const auth = createAuth(db, { publicOrigin: "http://localhost:8080", secret: TEST_SECRET });
-  const app = buildApp({ db, redis, auth, sessionSecret: TEST_SECRET });
+  const app = buildApp({ db, redis, auth, sessionSecret: TEST_SECRET, storage: TEST_STORAGE });
   app.addHook("onClose", async () => {
     await db.$client.end();
     redis.disconnect();

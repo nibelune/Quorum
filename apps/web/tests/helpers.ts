@@ -31,7 +31,10 @@ export async function signUpHost(host: Page): Promise<void> {
   await expect(host.getByRole("heading", { name: "Mes quiz" })).toBeVisible();
 }
 
-// Un QCM (Canberra) puis un vrai/faux (Faux).
+// Une image PNG d'un pixel, jointe à la première question.
+const PIXEL = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+
+// Un QCM illustré (Canberra) puis un vrai/faux (Faux).
 export async function createQuiz(host: Page): Promise<void> {
   await host.getByRole("link", { name: "Nouveau quiz" }).click();
   await host.getByLabel("Titre").fill("Géographie");
@@ -41,6 +44,8 @@ export async function createQuiz(host: Page): Promise<void> {
     await first.getByLabel(`Choix ${String(index + 1)}`, { exact: true }).fill(city);
   }
   await first.getByLabel("Bonne réponse").nth(1).check();
+  await first.getByLabel(/^Image/).setInputFiles({ name: "australie.png", mimeType: "image/png", buffer: PIXEL });
+  await expect(first.getByRole("img", { name: "Image de la question 1" })).toBeVisible();
   await host.getByRole("button", { name: "Ajouter un vrai/faux" }).click();
   const second = host.getByRole("group", { name: "Question 2" });
   await second.getByLabel("Énoncé").fill("La Terre est plate.");

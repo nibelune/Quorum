@@ -33,9 +33,18 @@ async function createGame(as = cookie, mode: GameMode = "solo") {
 test.each<GameMode>(["solo", "teams"])("crée une partie en mode %s avec un PIN et écrit son état initial dans Redis", async (mode) => {
   const { gameId, pin } = CreatedGame.parse((await createGame(cookie, mode)).json());
   const state = GameState.parse(JSON.parse((await redis.get(`game:${gameId}:state`)) ?? "null"));
-  expect(state).toEqual({ pin, mode, questions: quiz.questions, seq: 0, players: [], teams: [], current: { phase: "lobby" } });
+  // Les questions, mélangées, sont vérifiées à part.
+  expect(state).toMatchObject({ pin, mode, seq: 0, players: [], teams: [], current: { phase: "lobby" } });
   expect(await redis.get(`pin:${pin}`)).toBe(gameId);
   expect(await redis.ttl(`game:${gameId}:state`)).toBeGreaterThan(0);
+});
+
+test("mélange les choix de chaque question, en gardant la bonne réponse", async () => {
+  const { gameId } = CreatedGame.parse((await createGame()).json());
+  const { questions } = GameState.parse(JSON.parse((await redis.get(`game:${gameId}:state`)) ?? "null"));
+  const [question] = questions;
+  expect(question?.choices.toSorted()).toEqual(["Faux", "Vrai"]);
+  expect(question?.choices[question.correctIndex]).toBe("Vrai");
 });
 
 test("refuse de lancer le quiz d'un autre animateur", async () => {

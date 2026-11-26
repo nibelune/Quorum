@@ -28,6 +28,10 @@ export const MAX_CHOICES = 4;
 
 export const ChoiceIndex = z.int().min(0).max(MAX_CHOICES - 1);
 
+// Une image envoyée à l'API (ADR 0013) : seules les URL qu'elle délivre sont acceptées, jamais celles d'un site tiers.
+export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+export const ImageUrl = z.string().regex(/^\/api\/images\/[0-9a-f-]{36}\.(jpeg|png|webp)$/);
+
 // Une question vrai/faux est un QCM à deux choix.
 export const QuestionContent = z
   .object({
@@ -35,6 +39,7 @@ export const QuestionContent = z
     choices: z.array(z.string().trim().min(1).max(120)).min(2).max(MAX_CHOICES),
     correctIndex: ChoiceIndex,
     durationSec: z.int().min(5).max(300),
+    imageUrl: ImageUrl.optional(),
   })
   .refine((question) => question.correctIndex < question.choices.length);
 

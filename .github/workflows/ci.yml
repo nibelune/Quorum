@@ -25,6 +25,12 @@ jobs:
         ports:
           - 6379:6379
         options: --health-cmd "redis-cli ping" --health-interval 2s
+      s3:
+        image: adobe/s3mock:5
+        env:
+          COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: quorum
+        ports:
+          - 9090:9090
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6

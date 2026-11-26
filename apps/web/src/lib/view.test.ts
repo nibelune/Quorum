@@ -6,7 +6,13 @@ const alice = PlayerId.parse(crypto.randomUUID());
 const bob = PlayerId.parse(crypto.randomUUID());
 const reds = { teamId: TeamId.parse(crypto.randomUUID()), name: "Rouges" };
 const questionId = QuestionId.parse(crypto.randomUUID());
-const question = { questionId, text: "La Terre est ronde.", choices: ["Vrai", "Faux"], deadline: 1_000 };
+const question = {
+  questionId,
+  text: "La Terre est ronde.",
+  choices: ["Vrai", "Faux"],
+  imageUrl: `/api/images/${crypto.randomUUID()}.png`,
+  deadline: 1_000,
+};
 
 type JoinedView = Exclude<View, { role: "visitor" }>;
 const host: JoinedView = { role: "host", mode: "teams", pin: "123456", teams: [], players: [], stage: { phase: "lobby" } };

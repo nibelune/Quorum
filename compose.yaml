@@ -9,6 +9,10 @@ x-node: &node
     PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
     SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-not-for-production}
     BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-auth-secret-not-for-production}
+    S3_BUCKET_URL: http://s3:9090/quorum
+    S3_REGION: us-east-1
+    S3_ACCESS_KEY_ID: dev
+    S3_SECRET_ACCESS_KEY: dev
 
 services:
   postgres:
@@ -32,6 +36,18 @@ services:
       test: redis-cli ping
       interval: 2s
 
+  # Images des questions (ADR 0013) : un serveur compatible S3 à la place du bucket Railway. Il accepte n'importe quelles clés.
+  s3:
+    image: adobe/s3mock:5
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: quorum
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /s3mockroot
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
+    ports:
+      - 127.0.0.1:9090:9090
+    volumes:
+      - s3-data:/s3mockroot
+
   migrate:
     <<: *node
     command: node packages/db/src/migrate.ts
@@ -47,6 +63,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      s3:
+        condition: service_started
     healthcheck:
       test: [CMD, node, -e, "fetch('http://localhost:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 2s
@@ -97,3 +115,4 @@ services:
 
 volumes:
   postgres-data:
+  s3-data:

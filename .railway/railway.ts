@@ -1,4 +1,4 @@
-import { defineRailway, github, image, preserve, project, service, volume } from "railway/iac";
+import { bucket, defineRailway, github, image, preserve, project, service, volume } from "railway/iac";
 
 // Infrastructure de production sur Railway (ADR 0012). Appliquée à la main : `railway config plan`, puis `railway config apply`.
 // Les secrets ne sont jamais ici : `preserve()` garde la valeur posée dans Railway.
@@ -39,6 +39,9 @@ export default defineRailway(() => {
     volumeMounts: { "/data": redisData },
   });
 
+  // Images des questions (ADR 0013). Le bucket est privé : l'API est seule à y lire et écrire.
+  const images = bucket("images", { region: "ams" });
+
   const api = service("api", {
     ...fromRepo("apps/api/Dockerfile", ["apps/api/**", "packages/**", "pnpm-lock.yaml"]),
     preDeploy: "node /app/packages/db/src/migrate.ts",
@@ -50,6 +53,11 @@ export default defineRailway(() => {
       PUBLIC_ORIGIN,
       SESSION_SECRET: preserve(),
       BETTER_AUTH_SECRET: preserve(),
+      // Adressage par chemin, comme avec le serveur S3 local du Compose.
+      S3_BUCKET_URL: "${{images.ENDPOINT}}/${{images.BUCKET}}",
+      S3_REGION: "${{images.REGION}}",
+      S3_ACCESS_KEY_ID: "${{images.ACCESS_KEY_ID}}",
+      S3_SECRET_ACCESS_KEY: "${{images.SECRET_ACCESS_KEY}}",
     },
   });
 
@@ -82,6 +90,6 @@ export default defineRailway(() => {
   });
 
   return project("quorum", {
-    resources: [postgresData, postgres, redisData, redis, api, realtime, web, caddy],
+    resources: [postgresData, postgres, redisData, redis, images, api, realtime, web, caddy],
   });
 });

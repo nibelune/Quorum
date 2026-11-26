@@ -114,11 +114,34 @@
         </div>
       </section>
     {:else if stage.phase === "question" || stage.phase === "reveal"}
+      <!-- Les deux tiers du haut : l'énoncé, posé sur l'image de la question. Le tiers du bas : les réponses, en 2 × 2. -->
       <section class="question">
-        <header>
-          <h1>{stage.question.text}</h1>
-          {#if stage.phase === "question"}<Countdown deadline={stage.question.deadline} offset={game?.clockOffset ?? 0} />{/if}
-        </header>
+        <div class="stage">
+          {#if stage.question.imageUrl}<img src={stage.question.imageUrl} alt="Illustration de la question" />{/if}
+          <header>
+            <h1>{stage.question.text}</h1>
+            {#if stage.phase === "question"}<Countdown deadline={stage.question.deadline} offset={game?.clockOffset ?? 0} />{/if}
+          </header>
+          <footer>
+            {#if stage.phase === "question"}
+              <p>{stage.answerCount ?? 0} / {view.teams.length} {view.mode === "teams" ? "équipes ont répondu" : "réponses"}</p>
+              <button
+                disabled={game?.status !== "open"}
+                onclick={() => {
+                  send({ type: "next" });
+                }}>Arrêter la question</button
+              >
+            {:else}
+              <button
+                class="primary big"
+                disabled={game?.status !== "open"}
+                onclick={() => {
+                  send({ type: "next" });
+                }}>Classement</button
+              >
+            {/if}
+          </footer>
+        </div>
         <ul class="choices">
           {#each stage.question.choices as choice, index (index)}
             <li
@@ -134,25 +157,6 @@
             </li>
           {/each}
         </ul>
-        <footer>
-          {#if stage.phase === "question"}
-            <p>{stage.answerCount ?? 0} / {view.teams.length} {view.mode === "teams" ? "équipes ont répondu" : "réponses"}</p>
-            <button
-              disabled={game?.status !== "open"}
-              onclick={() => {
-                send({ type: "next" });
-              }}>Arrêter la question</button
-            >
-          {:else}
-            <button
-              class="primary big"
-              disabled={game?.status !== "open"}
-              onclick={() => {
-                send({ type: "next" });
-              }}>Classement</button
-            >
-          {/if}
-        </footer>
       </section>
     {:else if stage.phase === "leaderboard"}
       <section class="ranking">
@@ -181,8 +185,9 @@
 
 <style>
   main {
-    display: grid;
-    align-content: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     gap: 2rem;
     min-height: 100dvh;
     padding: clamp(1rem, 4vw, 3rem);
@@ -271,23 +276,71 @@
     color: var(--ink);
   }
 
-  .question header {
+  /* La question occupe tout l'écran : 2/3 pour l'énoncé et l'image, 1/3 pour les réponses. */
+  .question {
+    display: grid;
+    flex: 1;
+    grid-template-rows: 2fr 1fr;
+    gap: 1rem;
+  }
+
+  .stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1rem;
+    overflow: hidden;
+    border-radius: var(--radius);
+  }
+
+  /* L'image entière, sans recadrage, derrière l'énoncé. */
+  .stage img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .stage header,
+  .stage footer {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 2rem;
   }
 
-  .question h1 {
+  .stage header {
+    border-radius: var(--radius);
+    padding: 1rem 1.5rem;
+    background: rgb(0 0 0 / 55%);
+  }
+
+  .stage h1 {
     margin: 0;
     font-size: clamp(1.8rem, 3.5vw, 3rem);
   }
 
+  .stage footer button {
+    margin-left: auto;
+    color: var(--ink);
+  }
+
+  .stage footer p {
+    margin: 0;
+    border-radius: var(--radius);
+    padding: 0.5rem 1rem;
+    background: rgb(0 0 0 / 55%);
+  }
+
   .choices {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: 1fr;
     gap: 1rem;
-    margin: 2rem 0;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
@@ -296,10 +349,11 @@
     display: flex;
     align-items: center;
     gap: 1rem;
+    overflow: hidden;
     border-left: 0.6rem solid var(--color);
     border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
-    font-size: 1.3em;
+    padding: 1rem 1.5rem;
+    font-size: clamp(1rem, 2.2vw, 1.8rem);
     font-weight: 700;
     background: var(--surface);
     color: var(--ink);
@@ -317,13 +371,6 @@
   .votes {
     margin-left: auto;
     font-variant-numeric: tabular-nums;
-  }
-
-  footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
   }
 
   .ranking {
@@ -360,7 +407,7 @@
   }
 
   .end {
-    justify-self: end;
+    align-self: flex-end;
     border-color: transparent;
     background: transparent;
     color: inherit;

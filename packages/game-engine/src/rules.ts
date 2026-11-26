@@ -11,6 +11,15 @@ export function questionAt(state: GameState, index: number): Question {
   return question;
 }
 
+// Mélange les choix une fois pour toute la partie : l'écran projeté et les téléphones les montrent dans le même ordre.
+// L'aléa est fourni par l'appelant, comme l'heure : le moteur reste déterministe.
+export function shuffleChoices(question: Question, random: () => number): Question {
+  const remaining = question.choices.map((text, index) => ({ text, correct: index === question.correctIndex }));
+  const shuffled: typeof remaining = [];
+  while (remaining.length > 0) shuffled.push(...remaining.splice(Math.floor(random() * remaining.length), 1));
+  return { ...question, choices: shuffled.map(({ text }) => text), correctIndex: shuffled.findIndex(({ correct }) => correct) };
+}
+
 export function deadlineOf(question: Question, startedAt: number): number {
   return startedAt + question.durationSec * 1000;
 }
@@ -20,6 +29,7 @@ export function shownQuestion(question: Question, startedAt: number): ShownQuest
     questionId: question.id,
     text: question.text,
     choices: question.choices,
+    ...(question.imageUrl !== undefined && { imageUrl: question.imageUrl }),
     deadline: deadlineOf(question, startedAt),
   };
 }

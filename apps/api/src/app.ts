@@ -1,10 +1,12 @@
 import type { Db } from "@quorum/db";
+import type { AwsClient } from "aws4fetch";
 import { fromNodeHeaders } from "better-auth/node";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import type { Redis } from "ioredis";
 import type { Auth } from "./auth.ts";
 import { gameRoutes } from "./games.ts";
+import { imageRoutes, imageUploadRoutes } from "./images.ts";
 import { quizRoutes } from "./quizzes.ts";
 
 export interface Deps {
@@ -12,6 +14,8 @@ export interface Deps {
   redis: Redis;
   auth: Auth;
   sessionSecret: string;
+  // Bucket S3 des images (ADR 0013) : un client qui signe les requêtes, et l'URL du bucket.
+  storage: { client: AwsClient; bucketUrl: string };
 }
 
 declare module "fastify" {
@@ -26,6 +30,7 @@ export function buildApp(deps: Deps, logger: FastifyServerOptions["logger"] = fa
   app.setSerializerCompiler(serializerCompiler);
 
   app.get("/api/health", { logLevel: "silent" }, () => ({ ok: true }));
+  imageRoutes(app, deps);
 
   app.route({
     method: ["GET", "POST"],
@@ -54,6 +59,7 @@ export function buildApp(deps: Deps, logger: FastifyServerOptions["logger"] = fa
     });
     quizRoutes(animator, deps);
     gameRoutes(animator, deps);
+    imageUploadRoutes(animator, deps);
     done();
   });
 

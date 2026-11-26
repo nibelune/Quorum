@@ -1,5 +1,5 @@
-import { expect, test } from "vitest";
-import { GRACE_MS, podium, pointsFor, rankOf, top } from "./rules.ts";
+import { describe, expect, test } from "vitest";
+import { GRACE_MS, podium, pointsFor, rankOf, shuffleChoices, top } from "./rules.ts";
 import type { Team } from "./state.ts";
 import { alice, capital, red, T0 } from "./testing.ts";
 
@@ -44,4 +44,20 @@ test("le podium garde les 5 meilleures", () => {
 test("des équipes à égalité partagent le même rang", () => {
   const ranked = teams(100, 100, 50);
   expect(ranked.map((player) => rankOf(ranked, player))).toEqual([1, 1, 3]);
+});
+
+describe("shuffleChoices", () => {
+  const sequence = (...values: number[]) => () => values.shift() ?? 0;
+
+  test("réordonne les choix et suit la bonne réponse", () => {
+    // Chaque tirage prend l'un des choix restants : 0,9 le dernier, 0,5 celui du milieu, 0 le premier.
+    expect(shuffleChoices(capital, sequence(0.9, 0))).toMatchObject({ choices: ["Melbourne", "Sydney", "Canberra"], correctIndex: 2 });
+    expect(shuffleChoices(capital, sequence(0.5, 0))).toMatchObject({ choices: ["Canberra", "Sydney", "Melbourne"], correctIndex: 0 });
+  });
+
+  test.each([0, 0.3, 0.6, 0.99])("garde les mêmes choix et la même bonne réponse (aléa %d)", (value) => {
+    const shuffled = shuffleChoices(capital, () => value);
+    expect(shuffled.choices.toSorted()).toEqual(capital.choices.toSorted());
+    expect(shuffled.choices[shuffled.correctIndex]).toBe("Canberra");
+  });
 });

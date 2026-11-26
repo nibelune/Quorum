@@ -15,6 +15,7 @@ test("un animateur et trois joueurs jouent une partie complète", async ({ brows
 
   await test.step("question 1 : Alice et Bob trouvent, Chloé se trompe", async () => {
     await host.getByRole("button", { name: "Lancer la partie" }).click();
+    await expect(host.getByRole("img", { name: "Illustration de la question" })).toBeVisible();
     await answer([
       [alice, "Canberra"],
       [bob, "Canberra"],

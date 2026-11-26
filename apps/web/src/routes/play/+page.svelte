@@ -198,8 +198,8 @@
 
 <style>
   main {
-    display: grid;
-    align-content: start;
+    display: flex;
+    flex-direction: column;
     gap: 1.25rem;
     max-width: 32rem;
     min-height: 100dvh;
@@ -248,8 +248,12 @@
     font-weight: 700;
   }
 
+  /* Mêmes positions que sur l'écran projeté : 2 colonnes, sur toute la hauteur restante. */
   .answers {
     display: grid;
+    flex: 1;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: 1fr;
     gap: 0.75rem;
     margin: 0;
     padding: 0;
@@ -259,14 +263,16 @@
   .answers button,
   .answers li {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 1rem;
-    min-height: 5rem;
+    justify-content: center;
+    gap: 0.75rem;
+    overflow: hidden;
     border: none;
-    border-left: 0.6rem solid var(--color);
-    padding: 1rem;
-    font-size: 1.15rem;
-    text-align: left;
+    border-top: 0.6rem solid var(--color);
+    padding: 1rem 0.75rem;
+    font-size: 1.05rem;
+    text-align: center;
     box-shadow: var(--shadow);
   }
 
@@ -289,7 +295,6 @@
   }
 
   .pick {
-    margin-left: auto;
     font-size: 0.9rem;
   }
 

@@ -16,6 +16,7 @@ export const ShownQuestion = z.object({
   questionId: QuestionId,
   text: Question.shape.text,
   choices: Question.shape.choices,
+  imageUrl: Question.shape.imageUrl,
   deadline: z.int(),
 });
 export type ShownQuestion = z.infer<typeof ShownQuestion>;

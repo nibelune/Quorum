@@ -23,12 +23,15 @@ Ce document décrit le *comment*. Le *pourquoi* des choix est dans `docs/adr/`.
 - **api** gère les comptes, les quiz et la création des parties. Il écrit l'état initial d'une partie dans Redis et délivre les jetons animateur.
 - **realtime** gère tout le reste du cycle de vie d'une partie. Il ne parle qu'à Redis, jamais à Postgres.
 - **Postgres** contient les comptes et les quiz. Les questions d'un quiz sont stockées dans une colonne `jsonb` de la table `quizzes` (ADR 0009).
+- **Bucket S3** : les images des questions, que l'API est seule à lire et écrire (ADR 0013). En dev, `adobe/s3mock` le remplace.
 
 ## Déroulé d'une partie
 
 Phases : `lobby` -> `question` -> `reveal` -> `leaderboard` -> (question suivante ou) `ended`
 
-- Une question a un énoncé (300 caractères max), 2 à 4 choix (120 caractères max), une seule bonne réponse et une durée de 5 à 300 s. Une question vrai/faux est un QCM à deux choix.
+- Une question a un énoncé (300 caractères max), 2 à 4 choix (120 caractères max), une seule bonne réponse, une durée de 5 à 300 s et, au besoin, une image (JPEG, PNG ou WebP, 2 Mo max, ADR 0013). Une question vrai/faux est un QCM à deux choix.
+- Les choix de chaque question sont mélangés une fois, à la création de la partie : l'écran projeté et les téléphones les montrent dans le même ordre, une forme et une couleur par position.
+- Pendant une question, l'écran projeté consacre ses deux tiers du haut à l'énoncé, posé sur l'image, et son tiers du bas aux réponses, en 2 × 2. Les téléphones reprennent la même grille, sans l'image.
 - L'animateur crée une partie depuis le dashboard et choisit le mode : `solo` ou `teams`. Un PIN à 6 chiffres et un QR code s'affichent sur l'écran projeté.
 - Les joueurs rejoignent avec un pseudo (1 à 20 caractères, unique dans la partie sans tenir compte de la casse). On peut rejoindre jusqu'à la fin de la partie : un retardataire commence à 0 point.
 - L'animateur peut exclure un joueur : celui-ci est prévenu (`error { code: "kicked" }`) et ne peut plus répondre.
@@ -81,7 +84,7 @@ Messages JSON validés par zod, union discriminée sur `type`. Taille maximale :
 - Animateur : `start`, `next`, `kick { playerId }`, `end`
 
 **Serveur -> client**
-- Issus du flux d'événements, avec `seq` : `player_joined { playerId, nickname, team }` (animateur et visiteurs), `player_left`, `captain_changed { captain }` et `team_answer_locked { choiceIndex }` (équipe concernée uniquement), `question_started { questionId, text, choices, deadline }`, `answer_count` (animateur), `question_ended { correctIndex, distribution, you? }`, `leaderboard { top, you? }`, `game_ended { podium }`. `you`, `top` et `podium` portent sur les équipes (en solo, celles d'un membre) : une ligne de classement est `{ name, score }`.
+- Issus du flux d'événements, avec `seq` : `player_joined { playerId, nickname, team }` (animateur et visiteurs), `player_left`, `captain_changed { captain }` et `team_answer_locked { choiceIndex }` (équipe concernée uniquement), `question_started { questionId, text, choices, imageUrl?, deadline }`, `answer_count` (animateur), `question_ended { correctIndex, distribution, you? }`, `leaderboard { top, you? }`, `game_ended { podium }`. `you`, `top` et `podium` portent sur les équipes (en solo, celles d'un membre) : une ligne de classement est `{ name, score }`.
 - Locaux au nœud, sans `seq` : `game_info { mode, teams, canCreateTeam }` (réponse à `lookup` ; en solo, aucune équipe à choisir), `welcome { token }` (réponse à `join`), `snapshot { seq, view }`, `answer_received`, `pong { t, serverTime }`, `error { code }`, `reload`
 
 Si `protocolVersion` ne correspond pas, le serveur répond `reload` : le client recharge la page. Ça évite les incohérences après un déploiement.

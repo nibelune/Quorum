@@ -8,10 +8,12 @@ export async function api<T extends z.ZodType>(
   path: string,
   { method = "GET", body }: { method?: string; body?: unknown } = {},
 ): Promise<z.infer<T>> {
+  // Un fichier (une image) part tel quel, avec son type ; le reste en JSON.
+  const file = body instanceof Blob ? body : null;
   const response = await fetch(`/api${path}`, {
     method,
-    headers: body === undefined ? {} : { "content-type": "application/json" },
-    body: body === undefined ? null : JSON.stringify(body),
+    headers: body === undefined ? {} : { "content-type": file ? file.type : "application/json" },
+    body: body === undefined ? null : (file ?? JSON.stringify(body)),
   });
   if (response.status === 401) {
     await goto(resolve("/login"));
