@@ -1,13 +1,17 @@
 import type { Question } from "@quorum/protocol";
 import { index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { users } from "./auth-schema.ts";
+
+export * from "./auth-schema.ts";
 
 // Un quiz est toujours lu et enregistré en entier : ses questions tiennent dans une colonne jsonb (ADR 0009).
 export const quizzes = pgTable(
   "quizzes",
   {
     id: uuid().primaryKey().defaultRandom(),
-    // La clé étrangère vers `user` arrive avec les tables de Better Auth, dans la tâche api.
-    ownerId: uuid().notNull(),
+    ownerId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     title: text().notNull(),
     questions: jsonb().$type<Question[]>().notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

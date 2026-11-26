@@ -8,6 +8,13 @@
       "when": 1795718158351,
       "tag": "0000_quizzes",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795718815641,
+      "tag": "0001_auth",
+      "breakpoints": true
     }
   ]
 }
