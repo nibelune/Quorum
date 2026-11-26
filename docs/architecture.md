@@ -27,8 +27,9 @@ Phases : `lobby` -> `question` -> `reveal` -> `leaderboard` -> (question suivant
 
 - Une question a un énoncé (300 caractères max), 2 à 4 choix (120 caractères max), une seule bonne réponse et une durée de 5 à 300 s. Une question vrai/faux est un QCM à deux choix.
 - L'animateur crée une partie depuis le dashboard et choisit le mode : `solo` ou `teams`. Un PIN à 6 chiffres et un QR code s'affichent sur l'écran projeté.
-- Les joueurs rejoignent avec un pseudo (1 à 20 caractères, unique dans la partie).
-- Pendant `question`, chaque joueur répond une seule fois. Une réponse compte si elle est reçue avant `deadline + GRACE_MS` (250 ms de tolérance réseau).
+- Les joueurs rejoignent avec un pseudo (1 à 20 caractères, unique dans la partie sans tenir compte de la casse). On peut rejoindre jusqu'à la fin de la partie : un retardataire commence à 0 point.
+- L'animateur peut exclure un joueur : celui-ci est prévenu (`error { code: "kicked" }`) et ne peut plus répondre.
+- Pendant `question`, chaque joueur répond une seule fois. Une réponse compte si elle est reçue avant `deadline + GRACE_MS` (250 ms de tolérance réseau). La question se termine à ce moment-là, dès que tous les joueurs ont répondu, ou quand l'animateur passe à la suite.
 - Pendant `reveal`, on affiche la bonne réponse et la répartition des votes. La bonne réponse n'est **jamais** envoyée avant.
 - Pendant `leaderboard`, on affiche les 10 premiers ; chaque joueur voit aussi son rang sur son téléphone.
 - `ended` affiche le podium : les 5 premiers, qui restent à l'écran.
@@ -55,7 +56,7 @@ Toute la logique de jeu, sans I/O ni horloge :
 ```ts
 reduce(state: GameState, command: Command):
   | { ok: true; state: GameState; events: GameEvent[] }
-  | { ok: false; error: GameError }
+  | { ok: false; error: ErrorCode }
 
 project(event: GameEvent, to: Recipient): ServerMessage | null   // ce que ce destinataire a le droit de voir
 snapshot(state: GameState, to: Recipient): ServerMessage          // vue complète pour une reprise
@@ -102,12 +103,12 @@ Chaque partie a un **coordinateur** : le seul nœud qui applique les commandes e
 
 Seule exception, `lookup` est une lecture : il ne passe pas par le coordinateur. Le nœud lit l'état dans Redis et répond avec la vue `visitor` (mode et équipes, rien d'autre).
 
-Les échéances passent par le même chemin : le coordinateur programme un `setTimeout` sur `deadline`, qui ajoute une commande `timeout` au stream.
+Le chrono passe par le même chemin : pendant une question, le coordinateur ajoute une commande `tick` toutes les 250 ms. Elle émet `answer_count` si le nombre de réponses a changé, et clôt la question une fois `deadline + GRACE_MS` dépassé.
 
 ### Coordinateur et lease
 
 - Le lease `game:{id}:lease` vaut `{nodeId}:{token}` et expire au bout de 5 s (`SET NX PX`). Il est renouvelé toutes les 1,5 s. Le token provient de `INCR game:{id}:fence` (fencing token).
-- Tout nœud qui sert un client d'une partie sans coordinateur tente d'acquérir le lease. Le gagnant charge l'état, applique les commandes postérieures à la dernière traitée, puis reprogramme le chrono à partir de `deadline`.
+- Tout nœud qui sert un client d'une partie sans coordinateur tente d'acquérir le lease. Le gagnant charge l'état, applique les commandes postérieures à la dernière traitée, puis reprend les `tick`.
 - Un ancien coordinateur (pause GC, coupure réseau) ne peut plus rien écrire : `commit` rejette son token.
 - Après chaque `commit`, les commandes traitées sont supprimées (`XTRIM MINID`).
 
@@ -115,7 +116,7 @@ Les échéances passent par le même chemin : le coordinateur programme un `setT
 
 - L'ID d'une entrée du stream d'événements est `{seq}-0`, ce qui permet un `XRANGE` direct par numéro de séquence. Le stream est plafonné à environ 1000 entrées (`MAXLEN ~`).
 - Chaque nœud a une seule boucle `XREAD BLOCK` (200 ms) sur les streams de ses parties actives. Ce délai court permet d'intégrer une nouvelle partie sans connexion Redis supplémentaire.
-- Pas de tempête de messages : la liste des joueurs ne va qu'à l'écran animateur, et `answer_count` est limité à un envoi toutes les 250 ms par le coordinateur.
+- Pas de tempête de messages : la liste des joueurs ne va qu'à l'écran animateur, et `answer_count` n'est émis qu'au `tick`, au plus toutes les 250 ms.
 
 ### Reconnexion
 
