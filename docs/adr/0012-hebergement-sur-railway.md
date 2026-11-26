@@ -30,4 +30,6 @@ Quorum est hébergé sur Railway. L'infrastructure de production est décrite da
 - `compose.prod.yaml` est abandonné ; `compose.yaml` reste l'environnement de dev.
 - Postgres et Redis ne sont pas des bases gérées par Railway : pas de sauvegarde automatique pour l'instant.
 - En production, Better Auth limite les inscriptions et connexions par IP (par exemple 3 inscriptions par 10 secondes).
+- Railway injecte `PORT` et y adresse ses healthchecks : chaque app le fixe au port sur lequel elle écoute (3000).
+- Le domaine public est `quorum-live.up.railway.app` (`quorum.up.railway.app` était déjà pris).
 - Le coût dépend de l'usage : 8 conteneurs, dont 3 répliques de `realtime`.

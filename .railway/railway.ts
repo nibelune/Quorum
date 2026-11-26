@@ -14,9 +14,13 @@ function fromRepo(dockerfilePath: string, watchPatterns: string[]) {
 
 const PUBLIC_ORIGIN = "https://${{caddy.RAILWAY_PUBLIC_DOMAIN}}";
 const REDIS_URL = "redis://${{redis.RAILWAY_PRIVATE_DOMAIN}}:6379";
+// Railway injecte PORT et y adresse ses healthchecks : on le fixe au port d'écoute des apps.
+const PORT = "3000";
+// Région et taille fixées par Railway à la création : les reprendre ici évite qu'un plan tente de les réduire.
+const VOLUME = { region: "europe-west4-drams3a", sizeMB: 5000 };
 
 export default defineRailway(() => {
-  const postgresData = volume("postgres-data");
+  const postgresData = volume("postgres-data", VOLUME);
   const postgres = service("postgres", {
     source: image("postgres:17"),
     volumeMounts: { "/var/lib/postgresql/data": postgresData },
@@ -29,7 +33,7 @@ export default defineRailway(() => {
     },
   });
 
-  const redisData = volume("redis-data");
+  const redisData = volume("redis-data", VOLUME);
   const redis = service("redis", {
     source: image("redis:7.4"),
     volumeMounts: { "/data": redisData },
@@ -40,6 +44,7 @@ export default defineRailway(() => {
     preDeploy: "node /app/packages/db/src/migrate.ts",
     healthcheck: "/api/health",
     env: {
+      PORT,
       DATABASE_URL: "postgres://quorum:${{postgres.POSTGRES_PASSWORD}}@${{postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/quorum",
       REDIS_URL,
       PUBLIC_ORIGIN,
@@ -54,13 +59,13 @@ export default defineRailway(() => {
     replicas: 3,
     healthcheck: "/health",
     deploy: { drainingSeconds: 10 },
-    env: { REDIS_URL, PUBLIC_ORIGIN, SESSION_SECRET: api.env.SESSION_SECRET },
+    env: { PORT, REDIS_URL, PUBLIC_ORIGIN, SESSION_SECRET: api.env.SESSION_SECRET },
   });
 
   const web = service("web", {
     ...fromRepo("apps/web/Dockerfile", ["apps/web/**", "packages/protocol/**", "pnpm-lock.yaml"]),
     healthcheck: "/",
-    env: { PUBLIC_ORIGIN },
+    env: { PORT, PUBLIC_ORIGIN },
   });
 
   // Seul service public : il route /api, /ws et le web sur une même origine (cookie de session).
