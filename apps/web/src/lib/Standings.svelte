@@ -10,10 +10,10 @@
 </script>
 
 <ol>
-  {#each standings as { nickname, score }, rank (nickname)}
-    <li class={{ highlight: nickname === highlight }}>
+  {#each standings as { name, score }, rank (name)}
+    <li class={{ highlight: name === highlight }}>
       <span class="rank">{rank + 1}</span>
-      <span class="nickname">{nickname}</span>
+      <span class="name">{name}</span>
       <span class="score">{score}</span>
     </li>
   {/each}
@@ -53,7 +53,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .nickname {
+  .name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -12,9 +12,17 @@ export type QuizId = z.infer<typeof QuizId>;
 export const QuestionId = z.uuid().brand<"QuestionId">();
 export type QuestionId = z.infer<typeof QuestionId>;
 
+export const TeamId = z.uuid().brand<"TeamId">();
+export type TeamId = z.infer<typeof TeamId>;
+
 export const Pin = z.string().regex(/^\d{6}$/);
 
 export const Nickname = z.string().trim().min(1).max(20);
+
+export const TeamName = z.string().trim().min(1).max(24);
+
+export const GameMode = z.enum(["solo", "teams"]);
+export type GameMode = z.infer<typeof GameMode>;
 
 export const MAX_CHOICES = 4;
 

@@ -38,6 +38,8 @@
     send({ type: "kick", playerId });
   }
 
+  const plural = (count: number, word: string) => `${String(count)} ${word}${count > 1 ? "s" : ""}`;
+
   function end() {
     if (confirm("Terminer la partie maintenant ?")) send({ type: "end" });
   }
@@ -69,21 +71,39 @@
           {/await}
         </div>
         <div class="players">
-          <h2>{view.players.length} joueur{view.players.length > 1 ? "s" : ""}</h2>
-          <ul>
-            {#each view.players as player (player.playerId)}
-              <li>
-                {player.nickname}
-                <button
-                  class="kick"
-                  aria-label="Exclure {player.nickname}"
-                  onclick={() => {
-                    kick(player.playerId);
-                  }}>✕</button
-                >
-              </li>
+          {#snippet chip(player: { playerId: PlayerId; nickname: string }, captain = false)}
+            <li>
+              {player.nickname}{#if captain}&nbsp;(capitaine){/if}
+              <button
+                class="kick"
+                aria-label="Exclure {player.nickname}"
+                onclick={() => {
+                  kick(player.playerId);
+                }}>✕</button
+              >
+            </li>
+          {/snippet}
+          {#if view.mode === "teams"}
+            <h2>{plural(view.teams.length, "équipe")} · {plural(view.players.length, "joueur")}</h2>
+            {#each view.teams as team (team.teamId)}
+              <section class="team" aria-label={team.name}>
+                <h3>{team.name}</h3>
+                <ul>
+                  <!-- Le premier membre arrivé est le capitaine. -->
+                  {#each view.players.filter(({ teamId }) => teamId === team.teamId) as player, index (player.playerId)}
+                    {@render chip(player, index === 0)}
+                  {/each}
+                </ul>
+              </section>
             {/each}
-          </ul>
+          {:else}
+            <h2>{plural(view.players.length, "joueur")}</h2>
+            <ul>
+              {#each view.players as player (player.playerId)}
+                {@render chip(player)}
+              {/each}
+            </ul>
+          {/if}
           <button
             class="primary big"
             disabled={view.players.length === 0 || game?.status !== "open"}
@@ -116,7 +136,7 @@
         </ul>
         <footer>
           {#if stage.phase === "question"}
-            <p>{stage.answerCount ?? 0} / {view.players.length} réponses</p>
+            <p>{stage.answerCount ?? 0} / {view.teams.length} {view.mode === "teams" ? "équipes ont répondu" : "réponses"}</p>
             <button
               disabled={game?.status !== "open"}
               onclick={() => {
@@ -217,6 +237,10 @@
     margin: 0 0 1.5rem;
     padding: 0;
     list-style: none;
+  }
+
+  .team h3 {
+    margin: 0 0 0.5rem;
   }
 
   .players li {

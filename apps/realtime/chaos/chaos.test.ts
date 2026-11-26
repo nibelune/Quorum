@@ -108,7 +108,7 @@ async function createGame() {
     ).json(),
   );
   const { gameId, pin } = CreatedGame.parse(
-    await (await fetch(`${ORIGIN}/api/games`, { method: "POST", headers, body: JSON.stringify({ quizId: quiz.id }) })).json(),
+    await (await fetch(`${ORIGIN}/api/games`, { method: "POST", headers, body: JSON.stringify({ quizId: quiz.id, mode: "solo" }) })).json(),
   );
   const { token } = HostToken.parse(
     await (await fetch(`${ORIGIN}/api/games/${gameId}/host-token`, { method: "POST", headers: { origin: ORIGIN, cookie } })).json(),
@@ -130,7 +130,8 @@ test("la partie se termine normalement quand on tue son coordinateur en pleine q
   await host.receive("snapshot");
   const players = ["Alice", "Bob", "Chloé"].map((nickname) =>
     connect(undefined, (client) => {
-      client.send({ type: "join", pin, nickname });
+      client.send({ type: "lookup", pin });
+      client.send({ type: "join", nickname });
     }),
   );
   for (const player of players) await player.receive("welcome");

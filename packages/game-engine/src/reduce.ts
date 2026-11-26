@@ -1,6 +1,17 @@
 import type { ErrorCode } from "@quorum/protocol";
-import { deadlineOf, distribution, GRACE_MS, podium, pointsFor, questionAt, rankOf, shownQuestion, top } from "./rules.ts";
-import type { Command, GameEvent, GameState } from "./state.ts";
+import {
+  captainOf,
+  deadlineOf,
+  distribution,
+  GRACE_MS,
+  podium,
+  pointsFor,
+  questionAt,
+  rankOf,
+  shownQuestion,
+  top,
+} from "./rules.ts";
+import type { Command, GameEvent, GameState, Player, Team } from "./state.ts";
 
 export type ReduceResult = { ok: true; state: GameState; events: GameEvent[] } | { ok: false; error: ErrorCode };
 
@@ -10,18 +21,8 @@ type QuestionRound = Extract<GameState["current"], { phase: "question" }>;
 export function reduce(state: GameState, command: Command): ReduceResult {
   const { current } = state;
   switch (command.type) {
-    case "join": {
-      if (current.phase === "ended") return rejected("wrong_phase");
-      const nickname = command.nickname.toLocaleLowerCase();
-      if (state.players.some((player) => player.nickname.toLocaleLowerCase() === nickname)) {
-        return rejected("nickname_taken");
-      }
-      const { playerId } = command;
-      return emit(
-        { ...state, players: [...state.players, { playerId, nickname: command.nickname, score: 0 }] },
-        { type: "player_joined", playerId, nickname: command.nickname },
-      );
-    }
+    case "join":
+      return join(state, command);
     case "start":
       if (current.phase !== "lobby") return rejected("wrong_phase");
       if (state.players.length === 0) return rejected("no_players");
@@ -39,43 +40,91 @@ export function reduce(state: GameState, command: Command): ReduceResult {
     }
     case "next":
       return next(state, command.at);
-    case "kick": {
-      if (current.phase === "ended") return rejected("wrong_phase");
-      const { playerId } = command;
-      if (!state.players.some((player) => player.playerId === playerId)) return withoutEvent(state);
-      return emit(
-        {
-          ...state,
-          players: state.players.filter((player) => player.playerId !== playerId),
-          current:
-            current.phase === "question"
-              ? { ...current, answers: current.answers.filter((answer) => answer.playerId !== playerId) }
-              : current,
-        },
-        { type: "player_left", playerId },
-      );
-    }
+    case "kick":
+      return kick(state, command);
     case "end":
       if (current.phase === "ended") return rejected("wrong_phase");
       return endGame(state);
   }
 }
 
+function join(state: GameState, command: Extract<Command, { type: "join" }>): ReduceResult {
+  const { playerId, nickname, newTeamId, team } = command;
+  if (state.current.phase === "ended") return rejected("wrong_phase");
+  if (isTaken(state.players.map((player) => player.nickname), nickname)) return rejected("nickname_taken");
+  // En mode équipes, le joueur choisit son équipe. En solo, il en crée une à son nom.
+  if ((state.mode === "teams") !== (team !== undefined)) return rejected("invalid_message");
+  if (team && "join" in team) {
+    const joined = state.teams.find(({ teamId }) => teamId === team.join);
+    if (!joined) return rejected("team_not_found");
+    return addPlayer(state, { playerId, nickname, teamId: joined.teamId }, joined);
+  }
+  if (team && state.current.phase !== "lobby") return rejected("wrong_phase");
+  const name = team?.create ?? nickname;
+  if (isTaken(state.teams.map((existing) => existing.name), name)) return rejected("team_name_taken");
+  const created = { teamId: newTeamId, name, score: 0 };
+  return addPlayer({ ...state, teams: [...state.teams, created] }, { playerId, nickname, teamId: newTeamId }, created);
+}
+
+function addPlayer(state: GameState, player: Player, { teamId, name }: Team): ReduceResult {
+  return emit(
+    { ...state, players: [...state.players, player] },
+    { type: "player_joined", playerId: player.playerId, nickname: player.nickname, team: { teamId, name } },
+  );
+}
+
+// Pseudos et noms d'équipe sont uniques sans tenir compte de la casse.
+function isTaken(names: string[], name: string): boolean {
+  const lowered = name.toLocaleLowerCase();
+  return names.some((existing) => existing.toLocaleLowerCase() === lowered);
+}
+
 function answer(state: GameState, command: Extract<Command, { type: "answer" }>): ReduceResult {
   const { current } = state;
-  const { playerId } = command;
-  if (!state.players.some((player) => player.playerId === playerId)) return rejected("kicked");
+  const player = state.players.find(({ playerId }) => playerId === command.playerId);
+  if (!player) return rejected("kicked");
   if (current.phase !== "question") return rejected("too_late");
   const question = questionAt(state, current.index);
   if (question.id !== command.questionId || command.at > deadlineOf(question, current.startedAt) + GRACE_MS) {
     return rejected("too_late");
   }
   if (command.choiceIndex >= question.choices.length) return rejected("invalid_message");
-  if (current.answers.some((answer) => answer.playerId === playerId)) return rejected("already_answered");
+  const { playerId, teamId } = player;
+  if (captainOf(state, teamId)?.playerId !== playerId) return rejected("not_captain");
+  if (current.answers.some((answer) => answer.teamId === teamId)) return rejected("already_answered");
 
-  const round = { ...current, answers: [...current.answers, { playerId, choiceIndex: command.choiceIndex, at: command.at }] };
+  const { choiceIndex } = command;
+  const round = { ...current, answers: [...current.answers, { playerId, teamId, choiceIndex, at: command.at }] };
   const answered = { ...state, current: round };
-  return round.answers.length === state.players.length ? endQuestion(answered, round) : withoutEvent(answered);
+  if (round.answers.length === state.teams.length) return endQuestion(answered, round);
+  // Les coéquipiers voient aussitôt le choix de leur capitaine. Une équipe d'un membre, comme en solo, n'a personne à prévenir.
+  const hasTeammates = state.players.filter((member) => member.teamId === teamId).length > 1;
+  return hasTeammates ? emit(answered, { type: "team_answer_locked", teamId, choiceIndex }) : withoutEvent(answered);
+}
+
+function kick(state: GameState, command: Extract<Command, { type: "kick" }>): ReduceResult {
+  const { current } = state;
+  if (current.phase === "ended") return rejected("wrong_phase");
+  const player = state.players.find(({ playerId }) => playerId === command.playerId);
+  if (!player) return withoutEvent(state);
+  const { playerId, teamId } = player;
+  const players = state.players.filter((other) => other.playerId !== playerId);
+  const kicked = {
+    ...state,
+    players,
+    // Une équipe vide disparaît.
+    teams: players.some((other) => other.teamId === teamId) ? state.teams : state.teams.filter((team) => team.teamId !== teamId),
+    current:
+      current.phase === "question"
+        ? { ...current, answers: current.answers.filter((answer) => answer.playerId !== playerId) }
+        : current,
+  };
+  // La réponse d'un capitaine exclu part avec lui : son successeur, le membre arrivé le plus tôt, répond à sa place.
+  const successor = captainOf(kicked, teamId);
+  if (successor && captainOf(state, teamId)?.playerId === playerId) {
+    return emit(kicked, { type: "player_left", playerId }, { type: "captain_changed", teamId, captain: successor.nickname });
+  }
+  return emit(kicked, { type: "player_left", playerId });
 }
 
 function next(state: GameState, at: number): ReduceResult {
@@ -88,9 +137,9 @@ function next(state: GameState, at: number): ReduceResult {
         { ...state, current: { phase: "leaderboard", index: current.index } },
         {
           type: "leaderboard",
-          top: top(state.players),
+          top: top(state.teams),
           ranks: Object.fromEntries(
-            state.players.map((player) => [player.playerId, { rank: rankOf(state.players, player), score: player.score }]),
+            state.teams.map((team) => [team.teamId, { rank: rankOf(state.teams, team), score: team.score }]),
           ),
         },
       );
@@ -111,32 +160,35 @@ function startQuestion(state: GameState, index: number, at: number): ReduceResul
 
 function endQuestion(state: GameState, round: QuestionRound): ReduceResult {
   const question = questionAt(state, round.index);
-  const scored = state.players.map((player) => {
-    const points = pointsFor(question, round.startedAt, round.answers.find((a) => a.playerId === player.playerId));
-    return { player: { ...player, score: player.score + points }, points };
+  const scored = state.teams.map((team) => {
+    const points = pointsFor(question, round.startedAt, round.answers.find((answer) => answer.teamId === team.teamId));
+    return { team: { ...team, score: team.score + points }, points };
   });
   return emit(
     {
       ...state,
-      players: scored.map(({ player }) => player),
+      teams: scored.map(({ team }) => team),
       current: { phase: "reveal", index: round.index, startedAt: round.startedAt, answers: round.answers },
     },
     {
       type: "question_ended",
       correctIndex: question.correctIndex,
       distribution: distribution(question, round.answers),
-      results: Object.fromEntries(scored.map(({ player, points }) => [player.playerId, { points, score: player.score }])),
+      results: Object.fromEntries(scored.map(({ team, points }) => [team.teamId, { points, score: team.score }])),
     },
   );
 }
 
 function endGame(state: GameState): ReduceResult {
-  return emit({ ...state, current: { phase: "ended" } }, { type: "game_ended", podium: podium(state.players) });
+  return emit({ ...state, current: { phase: "ended" } }, { type: "game_ended", podium: podium(state.teams) });
 }
 
-function emit(state: GameState, event: Unsequenced<GameEvent>): ReduceResult {
-  const seq = state.seq + 1;
-  return { ok: true, state: { ...state, seq }, events: [{ ...event, seq }] };
+function emit(state: GameState, ...events: Unsequenced<GameEvent>[]): ReduceResult {
+  return {
+    ok: true,
+    state: { ...state, seq: state.seq + events.length },
+    events: events.map((event, index) => ({ ...event, seq: state.seq + index + 1 })),
+  };
 }
 
 function withoutEvent(state: GameState): ReduceResult {

@@ -1,5 +1,5 @@
 import { GameState } from "@quorum/game-engine";
-import { CreatedGame, HostToken, Quiz } from "@quorum/protocol";
+import { CreatedGame, type GameMode, HostToken, Quiz } from "@quorum/protocol";
 import { verifyToken } from "@quorum/protocol/token";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, expect, test } from "vitest";
@@ -26,14 +26,14 @@ afterAll(async () => {
   await app.close();
 });
 
-async function createGame(as = cookie) {
-  return app.inject({ method: "POST", url: "/api/games", headers: { cookie: as }, payload: { quizId: quiz.id } });
+async function createGame(as = cookie, mode: GameMode = "solo") {
+  return app.inject({ method: "POST", url: "/api/games", headers: { cookie: as }, payload: { quizId: quiz.id, mode } });
 }
 
-test("crée une partie avec un PIN et écrit son état initial dans Redis", async () => {
-  const { gameId, pin } = CreatedGame.parse((await createGame()).json());
+test.each<GameMode>(["solo", "teams"])("crée une partie en mode %s avec un PIN et écrit son état initial dans Redis", async (mode) => {
+  const { gameId, pin } = CreatedGame.parse((await createGame(cookie, mode)).json());
   const state = GameState.parse(JSON.parse((await redis.get(`game:${gameId}:state`)) ?? "null"));
-  expect(state).toEqual({ pin, questions: quiz.questions, seq: 0, players: [], current: { phase: "lobby" } });
+  expect(state).toEqual({ pin, mode, questions: quiz.questions, seq: 0, players: [], teams: [], current: { phase: "lobby" } });
   expect(await redis.get(`pin:${pin}`)).toBe(gameId);
   expect(await redis.ttl(`game:${gameId}:state`)).toBeGreaterThan(0);
 });

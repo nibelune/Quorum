@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { Command, GameState, type Recipient } from "@quorum/game-engine";
-import { ErrorCode, type GameId, type PlayerId, type ServerMessage } from "@quorum/protocol";
+import { ErrorCode, type GameId, type PlayerId, type ServerMessage, type TeamId } from "@quorum/protocol";
 import type { Redis } from "ioredis";
 import type { Logger } from "pino";
 import { WebSocket } from "ws";
@@ -22,7 +22,11 @@ export interface Deps {
   leaseMs: number;
 }
 
-export type Identity = { role: "host"; gameId: GameId } | { role: "player"; gameId: GameId; playerId: PlayerId };
+// Un visiteur a trouvé la partie par son PIN (`lookup`) et suit ses équipes en attendant de la rejoindre.
+export type Identity =
+  | { role: "host"; gameId: GameId }
+  | { role: "player"; gameId: GameId; playerId: PlayerId; teamId: TeamId }
+  | { role: "visitor"; gameId: GameId };
 
 export interface Client {
   id: string;
@@ -31,7 +35,7 @@ export interface Client {
   log: Logger;
   helloed: boolean;
   identity: Identity | undefined;
-  joining: { gameId: GameId; playerId: PlayerId } | undefined;
+  joining: { gameId: GameId; playerId: PlayerId; teamId: TeamId } | undefined;
   window: { start: number; count: number };
   // Dernier événement envoyé à ce client : la diffusion lui envoie la suite, dans l'ordre et sans trou.
   position: number;
@@ -96,7 +100,7 @@ export function send(client: Client, message: ServerMessage): void {
 }
 
 export function recipientOf(identity: Identity): Recipient {
-  return identity.role === "host" ? { role: "host" } : { role: "player", playerId: identity.playerId };
+  return identity.role === "player" ? { role: "player", playerId: identity.playerId, teamId: identity.teamId } : { role: identity.role };
 }
 
 export async function addCommand(deps: Deps, gameId: GameId, command: Command, replyTo?: Client): Promise<void> {
@@ -148,8 +152,7 @@ export async function releaseLease(node: Node, game: LocalGame): Promise<void> {
 
 // Plus aucun client ici : le nœud cesse de servir la partie.
 export async function release(node: Node, game: LocalGame): Promise<void> {
-  const joining = [...node.clients.values()].some((client) => client.joining?.gameId === game.id);
-  if (game.clients.size > 0 || joining) return;
+  if (game.clients.size > 0) return;
   node.games.delete(game.id);
   game.log.info("partie libérée");
   await releaseLease(node, game);

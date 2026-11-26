@@ -1,5 +1,5 @@
-import type { Question, ShownQuestion, Standing } from "@quorum/protocol";
-import type { Answer, GameState, Player } from "./state.ts";
+import type { Question, ShownQuestion, Standing, TeamId } from "@quorum/protocol";
+import type { Answer, GameState, Player, Team } from "./state.ts";
 
 export const GRACE_MS = 250;
 const TOP_SIZE = 10;
@@ -36,22 +36,27 @@ export function distribution(question: Question, answers: Answer[]): number[] {
   return question.choices.map((_, index) => answers.filter((answer) => answer.choiceIndex === index).length);
 }
 
-// Le tri est stable : à score égal, le joueur arrivé le plus tôt passe devant.
-function standings(players: Player[], size: number): Standing[] {
-  return players
+// Le membre arrivé le plus tôt : le créateur de l'équipe, puis le plus ancien s'il est exclu.
+export function captainOf(state: GameState, teamId: TeamId): Player | undefined {
+  return state.players.find((player) => player.teamId === teamId);
+}
+
+// Le tri est stable : à score égal, l'équipe créée la plus tôt passe devant.
+function standings(teams: Team[], size: number): Standing[] {
+  return teams
     .toSorted((a, b) => b.score - a.score)
     .slice(0, size)
-    .map(({ nickname, score }) => ({ nickname, score }));
+    .map(({ name, score }) => ({ name, score }));
 }
 
-export function top(players: Player[]): Standing[] {
-  return standings(players, TOP_SIZE);
+export function top(teams: Team[]): Standing[] {
+  return standings(teams, TOP_SIZE);
 }
 
-export function podium(players: Player[]): Standing[] {
-  return standings(players, PODIUM_SIZE);
+export function podium(teams: Team[]): Standing[] {
+  return standings(teams, PODIUM_SIZE);
 }
 
-export function rankOf(players: Player[], player: Player): number {
-  return 1 + players.filter((other) => other.score > player.score).length;
+export function rankOf(teams: Team[], team: Team): number {
+  return 1 + teams.filter((other) => other.score > team.score).length;
 }

@@ -24,7 +24,7 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 - [x] `make chaos` : test automatisé qui tue un nœud en pleine partie et vérifie que la partie se termine normalement
 - [x] Synchronisation d'horloge par `ping`/`pong`
 - [x] Mise en ligne sur Railway (un Dockerfile par app, HTTPS, `realtime` en 3 répliques) : première démo en ligne sur https://quorum-live.up.railway.app
-- [ ] Mode équipes : moteur (équipes, capitaine, score d'équipe), protocole (`lookup`, `team_answer_locked`...), écrans (choix de l'équipe au `join`, choix du capitaine visible par l'équipe, classement par équipes), e2e avec deux équipes
+- [x] Mode équipes : moteur (équipes, capitaine, score d'équipe), protocole (`lookup`, `team_answer_locked`...), écrans (choix de l'équipe au `join`, choix du capitaine visible par l'équipe, classement par équipes), e2e avec deux équipes
 
 ## Phase 3 : produit
 

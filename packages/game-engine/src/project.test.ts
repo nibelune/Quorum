@@ -1,18 +1,42 @@
+import type { PlayerId, TeamId } from "@quorum/protocol";
 import { describe, expect, test } from "vitest";
 import { project, type Recipient, snapshot } from "./project.ts";
 import type { GameEvent } from "./state.ts";
-import { alice, answer, bob, capital, carol, host, join, play, T0 } from "./testing.ts";
+import {
+  alice,
+  answer,
+  blue,
+  bob,
+  capital,
+  carol,
+  createTeam,
+  host,
+  join,
+  joinTeam,
+  play,
+  playTeams,
+  red,
+  soloTeam,
+  T0,
+} from "./testing.ts";
 
 const toHost: Recipient = { role: "host" };
-const toPlayer = (playerId: typeof alice): Recipient => ({ role: "player", playerId });
+const toVisitor: Recipient = { role: "visitor" };
+const toPlayer = (playerId: PlayerId, teamId: TeamId = soloTeam(playerId)): Recipient => ({ role: "player", playerId, teamId });
 
 describe("project", () => {
-  test.each<GameEvent>([
-    { type: "player_joined", seq: 1, playerId: alice, nickname: "Alice" },
-    { type: "answer_count", seq: 4, count: 1 },
-  ])("$type ne va qu'à l'animateur", (event) => {
+  test("player_joined va à l'animateur et aux visiteurs, qui suivent les équipes", () => {
+    const event: GameEvent = { type: "player_joined", seq: 1, playerId: alice, nickname: "Alice", team: { teamId: red, name: "Rouges" } };
+    expect(project(event, toHost)).toBe(event);
+    expect(project(event, toVisitor)).toBe(event);
+    expect(project(event, toPlayer(alice))).toBeNull();
+  });
+
+  test("answer_count ne va qu'à l'animateur", () => {
+    const event: GameEvent = { type: "answer_count", seq: 4, count: 1 };
     expect(project(event, toHost)).toBe(event);
     expect(project(event, toPlayer(alice))).toBeNull();
+    expect(project(event, toVisitor)).toBeNull();
   });
 
   test("player_left va à l'animateur et prévient le joueur exclu", () => {
@@ -22,33 +46,44 @@ describe("project", () => {
     expect(project(event, toPlayer(bob))).toBeNull();
   });
 
-  test.each<GameEvent>([
-    { type: "question_started", seq: 3, questionId: capital.id, text: capital.text, choices: capital.choices, deadline: T0 },
-    { type: "game_ended", seq: 9, podium: [{ nickname: "Alice", score: 1000 }] },
-  ])("$type va à tout le monde tel quel", (event) => {
-    expect(project(event, toHost)).toBe(event);
-    expect(project(event, toPlayer(alice))).toBe(event);
+  test.each<Extract<GameEvent, { teamId: TeamId }>>([
+    { type: "team_answer_locked", seq: 5, teamId: red, choiceIndex: 1 },
+    { type: "captain_changed", seq: 5, teamId: red, captain: "Bob" },
+  ])("$type ne va qu'aux membres de l'équipe concernée", (event) => {
+    const { teamId, ...message } = event;
+    expect(project(event, toPlayer(bob, teamId))).toStrictEqual(message);
+    expect(project(event, toPlayer(carol, blue))).toBeNull();
+    expect(project(event, toHost)).toBeNull();
   });
 
-  test("question_ended ne donne à chaque joueur que son propre résultat", () => {
+  test.each<GameEvent>([
+    { type: "question_started", seq: 3, questionId: capital.id, text: capital.text, choices: capital.choices, deadline: T0 },
+    { type: "game_ended", seq: 9, podium: [{ name: "Alice", score: 1000 }] },
+  ])("$type va tel quel à l'animateur et aux joueurs", (event) => {
+    expect(project(event, toHost)).toBe(event);
+    expect(project(event, toPlayer(alice))).toBe(event);
+    expect(project(event, toVisitor)).toBeNull();
+  });
+
+  test("question_ended ne donne à chaque joueur que le résultat de son équipe", () => {
     const event: GameEvent = {
       type: "question_ended",
       seq: 4,
       correctIndex: 1,
       distribution: [1, 1, 0],
-      results: { [alice]: { points: 1000, score: 1000 }, [bob]: { points: 0, score: 0 } },
+      results: { [red]: { points: 1000, score: 1000 }, [blue]: { points: 0, score: 0 } },
     };
     const shared = { type: "question_ended", seq: 4, correctIndex: 1, distribution: [1, 1, 0] };
     expect(project(event, toHost)).toStrictEqual(shared);
-    expect(project(event, toPlayer(alice))).toStrictEqual({ ...shared, you: { points: 1000, score: 1000 } });
+    expect(project(event, toPlayer(bob, red))).toStrictEqual({ ...shared, you: { points: 1000, score: 1000 } });
     expect(project(event, toPlayer(carol))).toEqual(shared);
   });
 
-  test("leaderboard ne donne à chaque joueur que son propre rang", () => {
-    const top = [{ nickname: "Alice", score: 1000 }];
-    const event: GameEvent = { type: "leaderboard", seq: 5, top, ranks: { [alice]: { rank: 1, score: 1000 } } };
+  test("leaderboard ne donne à chaque joueur que le rang de son équipe", () => {
+    const top = [{ name: "Rouges", score: 1000 }];
+    const event: GameEvent = { type: "leaderboard", seq: 5, top, ranks: { [red]: { rank: 1, score: 1000 } } };
     expect(project(event, toHost)).toStrictEqual({ type: "leaderboard", seq: 5, top });
-    expect(project(event, toPlayer(alice))).toStrictEqual({ type: "leaderboard", seq: 5, top, you: { rank: 1, score: 1000 } });
+    expect(project(event, toPlayer(bob, red))).toStrictEqual({ type: "leaderboard", seq: 5, top, you: { rank: 1, score: 1000 } });
   });
 });
 
@@ -57,29 +92,40 @@ describe("snapshot", () => {
   const question = [...lobby, host("start"), answer(alice, 1)];
   const shown = { questionId: capital.id, text: capital.text, choices: capital.choices, deadline: T0 + 20_000 };
 
-  test("donne à l'animateur le PIN et les joueurs", () => {
+  test("donne à l'animateur le mode, le PIN, les équipes et les joueurs", () => {
     expect(snapshot(play(...lobby).state, toHost)).toStrictEqual({
       type: "snapshot",
       seq: 2,
       view: {
         role: "host",
+        mode: "solo",
         pin: "123456",
+        teams: [
+          { teamId: soloTeam(alice), name: "Alice" },
+          { teamId: soloTeam(bob), name: "Bob" },
+        ],
         players: [
-          { playerId: alice, nickname: "Alice" },
-          { playerId: bob, nickname: "Bob" },
+          { playerId: alice, nickname: "Alice", teamId: soloTeam(alice) },
+          { playerId: bob, nickname: "Bob", teamId: soloTeam(bob) },
         ],
         stage: { phase: "lobby" },
       },
     });
   });
 
-  test("pendant une question, donne le nombre de réponses à l'animateur et à chaque joueur s'il a répondu", () => {
+  test("pendant une question, donne le nombre de réponses à l'animateur et à chaque joueur la réponse de son équipe", () => {
     const { state } = play(...question);
     expect(snapshot(state, toHost)).toMatchObject({ view: { stage: { phase: "question", question: shown, answerCount: 1 } } });
     expect(snapshot(state, toPlayer(alice))).toStrictEqual({
       type: "snapshot",
       seq: 3,
-      view: { role: "player", nickname: "Alice", stage: { phase: "question", question: shown, answered: true } },
+      view: {
+        role: "player",
+        mode: "solo",
+        nickname: "Alice",
+        team: { name: "Alice", captain: "Alice" },
+        stage: { phase: "question", question: shown, answered: true, teamAnswer: 1 },
+      },
     });
     expect(snapshot(state, toPlayer(bob))).toMatchObject({ view: { stage: { answered: false } } });
   });
@@ -102,18 +148,43 @@ describe("snapshot", () => {
   test("pendant le classement, donne à chaque joueur son rang", () => {
     const { state } = play(...question, answer(bob, 0), host("next"));
     expect(snapshot(state, toPlayer(bob))).toMatchObject({
-      view: { stage: { phase: "leaderboard", top: [{ nickname: "Alice" }, { nickname: "Bob" }], you: { rank: 2, score: 0 } } },
+      view: { stage: { phase: "leaderboard", top: [{ name: "Alice" }, { name: "Bob" }], you: { rank: 2, score: 0 } } },
     });
   });
 
   test("à la fin, donne le podium", () => {
     expect(snapshot(play(...lobby, host("end")).state, toPlayer(alice))).toMatchObject({
-      view: { stage: { phase: "ended", podium: [{ nickname: "Alice" }, { nickname: "Bob" }] } },
+      view: { stage: { phase: "ended", podium: [{ name: "Alice" }, { name: "Bob" }] } },
     });
   });
 
   test("prévient un joueur qui ne fait plus partie de la partie", () => {
     expect(snapshot(play(...lobby).state, toPlayer(carol))).toEqual({ type: "error", code: "kicked" });
+  });
+
+  describe("en mode équipes", () => {
+    const teamLobby = [createTeam(alice, "Alice", red, "Rouges"), joinTeam(bob, "Bob", red), createTeam(carol, "Carol", blue, "Bleus")];
+
+    test("donne au visiteur les équipes, qu'il peut rejoindre ou, tant que la partie n'a pas commencé, compléter", () => {
+      const teams = [
+        { teamId: red, name: "Rouges" },
+        { teamId: blue, name: "Bleus" },
+      ];
+      const info = { type: "game_info", mode: "teams", teams };
+      expect(snapshot(playTeams(...teamLobby).state, toVisitor)).toEqual({ ...info, canCreateTeam: true });
+      expect(snapshot(playTeams(...teamLobby, host("start")).state, toVisitor)).toEqual({ ...info, canCreateTeam: false });
+    });
+
+    test("donne à chaque membre son équipe, son capitaine et le choix de celui-ci", () => {
+      const { state } = playTeams(...teamLobby, host("start"), answer(alice, 2));
+      expect(snapshot(state, toPlayer(bob, red))).toMatchObject({
+        view: { nickname: "Bob", team: { name: "Rouges", captain: "Alice" }, stage: { answered: true, teamAnswer: 2 } },
+      });
+    });
+  });
+
+  test("en solo, ne donne au visiteur aucune équipe à choisir", () => {
+    expect(snapshot(play(...lobby).state, toVisitor)).toEqual({ type: "game_info", mode: "solo", teams: [], canCreateTeam: false });
   });
 });
 

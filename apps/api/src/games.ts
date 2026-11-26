@@ -27,7 +27,7 @@ export function gameRoutes(app: FastifyInstance, { db, redis, sessionSecret }: D
     const pin = await reservePin(redis, gameId);
     await redis
       .multi()
-      .set(`game:${gameId}:state`, JSON.stringify(createGame(pin, quiz.questions)), "EX", GAME_TTL_SECONDS)
+      .set(`game:${gameId}:state`, JSON.stringify(createGame(pin, quiz.questions, request.body.mode)), "EX", GAME_TTL_SECONDS)
       .set(`game:${gameId}:owner`, request.userId, "EX", GAME_TTL_SECONDS)
       .exec();
     return reply.code(201).send({ gameId, pin });

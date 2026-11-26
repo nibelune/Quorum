@@ -46,7 +46,7 @@ Pensé pour les soirées en bar : une équipe par table, qui discute avant de r�
 - En rejoignant, le joueur crée une équipe (nom de 1 à 24 caractères, unique dans la partie) ou rejoint une équipe existante. Il ne peut plus en changer ensuite. Après le lancement de la partie, on ne peut plus créer d'équipe, seulement en rejoindre une.
 - Le créateur de l'équipe en est le **capitaine**. Lui seul envoie la réponse de l'équipe ; une réponse envoyée par un autre membre est refusée (`not_captain`).
 - Dès que le capitaine a répondu, ses coéquipiers voient son choix sur leur téléphone (`team_answer_locked`). Les autres équipes ne le voient pas.
-- Si le capitaine quitte la partie ou en est exclu, le membre arrivé le plus tôt devient capitaine (`captain_changed`). Une équipe vide disparaît.
+- Si le capitaine est exclu, le membre arrivé le plus tôt devient capitaine (`captain_changed`) ; la réponse de l'exclu part avec lui, et son successeur peut répondre. Un joueur ne quitte jamais une partie de lui-même : si le téléphone du capitaine s'éteint, l'animateur l'exclut. Une équipe vide disparaît.
 - Le score se calcule comme en solo, sur la réponse et le temps de réponse du capitaine, et il est attribué à l'équipe. Le classement et le podium sont ceux des équipes.
 - Une table avec un seul téléphone forme simplement une équipe d'un membre.
 
@@ -65,9 +65,11 @@ project(event: GameEvent, to: Recipient): ServerMessage | null   // ce que ce de
 snapshot(state: GameState, to: Recipient): ServerMessage          // vue complète pour une reprise
 ```
 
+Le moteur a toujours des équipes : en solo, chaque joueur forme une équipe d'un membre, à son nom, dont il est le capitaine. Scores, classements et podium portent donc toujours sur les équipes, sans cas particulier ; le mode n'intervient qu'au `join`.
+
 Chaque commande porte `at` (horodatage de réception). `project` et `snapshot` garantissent qu'un joueur ne reçoit que ce qui le concerne. C'est là que la bonne réponse est masquée avant `reveal`, et que le choix d'un capitaine n'est montré qu'à son équipe.
 
-`Recipient` vaut `{ role: "host" }`, `{ role: "player", playerId, teamId? }` ou `{ role: "visitor" }` (un joueur qui a saisi le PIN mais n'a pas encore rejoint la partie).
+`Recipient` vaut `{ role: "host" }`, `{ role: "player", playerId, teamId }` ou `{ role: "visitor" }` (un joueur qui a saisi le PIN mais n'a pas encore rejoint la partie). Pour un visiteur, `snapshot` renvoie `game_info`.
 
 ## Protocole (`packages/protocol`)
 
@@ -75,23 +77,23 @@ Messages JSON validés par zod, union discriminée sur `type`. Taille maximale :
 
 **Client -> serveur**
 - Tous : `hello { protocolVersion, token?, lastSeq? }` (premier message de chaque connexion), `ping { t }`
-- Joueur : `lookup { pin }` (avant de rejoindre : récupère le mode et la liste des équipes), `join { pin, nickname, team? }` avec `team` = `{ create: name }` ou `{ join: teamId }` en mode équipes, `answer { questionId, choiceIndex }`
+- Joueur : `lookup { pin }` (avant de rejoindre : récupère le mode et la liste des équipes), puis `join { nickname, team? }` dans la partie trouvée, avec `team` = `{ create: name }` ou `{ join: teamId }` en mode équipes, `answer { questionId, choiceIndex }`
 - Animateur : `start`, `next`, `kick { playerId }`, `end`
 
 **Serveur -> client**
-- Issus du flux d'événements, avec `seq` : `player_joined`, `player_left`, `team_created`, `captain_changed`, `question_started { questionId, text, choices, deadline }`, `team_answer_locked { choiceIndex }` (équipe concernée uniquement), `answer_count` (animateur), `question_ended { correctIndex, distribution, you? }`, `leaderboard { top, you? }`, `game_ended { podium }`. En mode équipes, `you`, `top` et `podium` portent sur les équipes.
-- Locaux au nœud, sans `seq` : `game_info { mode, teams? }` (réponse à `lookup`), `welcome { playerId, teamId?, token }` (réponse à `join`), `snapshot { seq, view }`, `answer_received`, `pong { t, serverTime }`, `error { code }`, `reload`
+- Issus du flux d'événements, avec `seq` : `player_joined { playerId, nickname, team }` (animateur et visiteurs), `player_left`, `captain_changed { captain }` et `team_answer_locked { choiceIndex }` (équipe concernée uniquement), `question_started { questionId, text, choices, deadline }`, `answer_count` (animateur), `question_ended { correctIndex, distribution, you? }`, `leaderboard { top, you? }`, `game_ended { podium }`. `you`, `top` et `podium` portent sur les équipes (en solo, celles d'un membre) : une ligne de classement est `{ name, score }`.
+- Locaux au nœud, sans `seq` : `game_info { mode, teams, canCreateTeam }` (réponse à `lookup` ; en solo, aucune équipe à choisir), `welcome { token }` (réponse à `join`), `snapshot { seq, view }`, `answer_received`, `pong { t, serverTime }`, `error { code }`, `reload`
 
 Si `protocolVersion` ne correspond pas, le serveur répond `reload` : le client recharge la page. Ça évite les incohérences après un déploiement.
 
 ## Identité et sécurité
 
-- **Joueur** : au `join`, le nœud génère un `playerId` et un jeton HMAC (`node:crypto`) contenant `{ gameId, playerId, teamId?, role: "player" }`. L'équipe étant fixée au `join`, elle peut figurer dans le jeton. Le client le garde en `sessionStorage` et le renvoie dans `hello` à chaque reconnexion.
+- **Joueur** : au `join`, le nœud génère un `playerId` et un jeton HMAC (`node:crypto`) contenant `{ gameId, playerId, teamId, role: "player" }`. L'équipe étant fixée au `join`, elle peut figurer dans le jeton. Le client le garde en `sessionStorage` et le renvoie dans `hello` à chaque reconnexion.
 - **Animateur** : l'écran `/host/[gameId]` demande à l'API un jeton `role: "host"`, valable 15 minutes (`POST /api/games/:id/host-token`, authentifié par la session Better Auth et réservé au propriétaire de la partie). `realtime` vérifie seulement la signature, sans accès à la base.
 - Format du jeton : `base64url(payload).base64url(HMAC-SHA256)`, signé et vérifié par `@quorum/protocol/token` (réservé à Node). Un jeton animateur expiré est redemandé à l'API à la reconnexion.
 - Secret HMAC partagé entre `api` et `realtime` via la variable d'environnement `SESSION_SECRET`.
 - Upgrade WebSocket refusé si l'en-tête `Origin` ne correspond pas à `PUBLIC_ORIGIN`.
-- Rate limit par connexion (20 messages/s, fermeture avec le code 1008 au-delà) et par IP pour les PIN inconnus : au-delà de 10 `lookup` ou `join` visant un PIN inexistant en une minute, les suivants sont refusés (compteur Redis). Tester les PIN un par un reste impraticable, alors qu'une salle entière derrière une même IP (le Wi-Fi d'un bar) peut rejoindre. L'IP est lue dans `X-Real-IP`, toujours posé par Caddy : en dev, c'est l'adresse de la connexion ; en production, celle que pose le point d'entrée de Railway (ADR 0012).
+- Rate limit par connexion (20 messages/s, fermeture avec le code 1008 au-delà) et par IP pour les PIN inconnus : au-delà de 10 `lookup` visant un PIN inexistant en une minute, les suivants sont refusés (compteur Redis). Tester les PIN un par un reste impraticable, alors qu'une salle entière derrière une même IP (le Wi-Fi d'un bar) peut rejoindre. L'IP est lue dans `X-Real-IP`, toujours posé par Caddy : en dev, c'est l'adresse de la connexion ; en production, celle que pose le point d'entrée de Railway (ADR 0012).
 - Les commandes animateur sont refusées pour un jeton `player`.
 
 ## Multi-serveurs : un écrivain unique par partie
@@ -106,7 +108,7 @@ Chaque partie a un **coordinateur** : le seul nœud qui applique les commandes e
 4. Chaque nœud lit les streams d'événements des parties dont il sert au moins un client. Pour chaque socket locale, il applique `project` et envoie le résultat.
 5. Un refus de `reduce` (`nickname_taken`, `too_late`...) et un `join` accepté appellent une réponse individuelle. Après le `commit`, le coordinateur la publie sur `node:{nodeId}:replies`, le canal Pub/Sub du nœud qui a reçu la commande (ADR 0010). Ce nœud envoie `error` à la socket, ou `welcome` puis `snapshot` pour un `join`.
 
-Seule exception, `lookup` est une lecture : il ne passe pas par le coordinateur. Le nœud lit l'état dans Redis et répond avec la vue `visitor` (mode et équipes, rien d'autre).
+Seule exception, `lookup` est une lecture : il ne passe pas par le coordinateur. Le nœud lit l'état dans Redis et répond avec la vue `visitor` (mode et équipes, rien d'autre). La connexion reste ensuite abonnée à la partie comme visiteur : elle reçoit `player_joined`, ce qui tient la liste des équipes à jour, et son `join` vise la partie trouvée. Un `join` refusé (pseudo pris...) la laisse visiteur, prête à réessayer.
 
 Le chrono passe par le même chemin : pendant une question, le coordinateur ajoute une commande `tick` toutes les 250 ms. Elle émet `answer_count` si le nombre de réponses a changé, et clôt la question une fois `deadline + GRACE_MS` dépassé.
 
@@ -156,7 +158,7 @@ game:{id}:events        stream des événements, ID = {seq}-0, MAXLEN ~1000
 game:{id}:lease         {nodeId}:{token}, PX 5000
 game:{id}:fence         compteur de fencing tokens
 node:{nodeId}:replies   canal Pub/Sub des réponses individuelles (refus, join accepté)
-ratelimit:join:{ip}     compteur de PIN inconnus, TTL 60 s
+ratelimit:lookup:{ip}   compteur de PIN inconnus, TTL 60 s
 ```
 
 Toutes les clés d'une partie ont un TTL de 2 h, renouvelé à chaque `commit`.

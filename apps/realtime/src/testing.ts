@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { createGame } from "@quorum/game-engine";
-import { GameId, PROTOCOL_VERSION, Question, ServerMessage } from "@quorum/protocol";
+import { GameId, type GameMode, PROTOCOL_VERSION, Question, ServerMessage, type TeamChoice } from "@quorum/protocol";
 import { signToken } from "@quorum/protocol/token";
 import { Redis } from "ioredis";
 import { pino } from "pino";
@@ -52,11 +52,11 @@ export async function startTestNode({ leaseMs = 600 } = {}) {
 }
 
 // Écrit une partie dans Redis comme le fait l'API, et renvoie de quoi s'y connecter.
-export async function createTestGame(redis: Redis) {
+export async function createTestGame(redis: Redis, mode: GameMode = "solo") {
   const gameId = GameId.parse(crypto.randomUUID());
   const pin = String(randomInt(0, 1_000_000)).padStart(6, "0");
   await redis.set(`pin:${pin}`, gameId);
-  await redis.set(keys(gameId).state, JSON.stringify(createGame(pin, [question])));
+  await redis.set(keys(gameId).state, JSON.stringify(createGame(pin, [question], mode)));
   const hostToken = signToken({ role: "host", gameId, exp: Date.now() + 60_000 }, SECRET);
   return { gameId, pin, hostToken };
 }
@@ -131,11 +131,23 @@ export async function connectHost(url: string, hostToken: string): Promise<TestC
   return host;
 }
 
-export async function joinAs(url: string, pin: string, nickname: string, headers: Record<string, string> = {}) {
-  const player = await connect(url, headers);
-  player.send({ type: "hello", protocolVersion: PROTOCOL_VERSION });
-  player.send({ type: "join", pin, nickname });
+// Trouve la partie par son PIN : le client y devient visiteur, et reçoit les équipes à choisir.
+export async function visit(url: string, pin: string, headers: Record<string, string> = {}) {
+  const visitor = await connect(url, headers);
+  visitor.send({ type: "hello", protocolVersion: PROTOCOL_VERSION });
+  visitor.send({ type: "lookup", pin });
+  return { visitor, info: await visitor.receive("game_info") };
+}
+
+export async function joinAs(
+  url: string,
+  pin: string,
+  nickname: string,
+  { headers, team }: { headers?: Record<string, string>; team?: TeamChoice } = {},
+) {
+  const { visitor: player } = await visit(url, pin, headers);
+  player.send({ type: "join", nickname, team });
   const { token } = await player.receive("welcome");
-  await player.receive("snapshot");
-  return { player, token };
+  const { view } = await player.receive("snapshot");
+  return { player, token, view };
 }

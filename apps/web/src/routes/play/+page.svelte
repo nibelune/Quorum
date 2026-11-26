@@ -5,7 +5,7 @@
   import Standings from "$lib/Standings.svelte";
   import { GameConnection } from "$lib/game.svelte";
   import { errorMessage } from "$lib/messages";
-  import type { ErrorCode } from "@quorum/protocol";
+  import type { ErrorCode, TeamChoice } from "@quorum/protocol";
   import { onDestroy } from "svelte";
 
   // Le jeton survit au rechargement de la page : le joueur reprend la partie là où il en était.
@@ -13,6 +13,7 @@
 
   let pin = $state(page.url.searchParams.get("pin") ?? "");
   let nickname = $state("");
+  let teamName = $state("");
   let game: GameConnection | null = $state(null);
 
   const savedToken = sessionStorage.getItem(TOKEN_KEY);
@@ -20,17 +21,25 @@
   onDestroy(() => game?.close());
 
   const view = $derived(game?.view?.role === "player" ? game.view : null);
+  // En mode équipes, le visiteur choisit son équipe avant de rejoindre. Un pseudo déjà pris le renvoie au formulaire.
+  const visitor = $derived(
+    game?.view?.role === "visitor" && game.view.mode === "teams" && game.error !== "nickname_taken" ? game.view : null,
+  );
 
   function forgetSession(code: ErrorCode) {
     if (code === "invalid_token" || code === "game_not_found" || code === "kicked") sessionStorage.removeItem(TOKEN_KEY);
   }
 
-  function join(event: SubmitEvent) {
+  function lookup(event: SubmitEvent) {
     event.preventDefault();
     game?.close();
     game = new GameConnection({
       onOpen: (connection) => {
-        connection.send({ type: "join", pin, nickname });
+        connection.send({ type: "lookup", pin });
+      },
+      // En solo, il n'y a pas d'équipe à choisir : le joueur rejoint aussitôt.
+      onGameInfo: (connection, { mode }) => {
+        if (mode === "solo") connection.send({ type: "join", nickname });
       },
       onWelcome: (token) => {
         sessionStorage.setItem(TOKEN_KEY, token);
@@ -39,12 +48,21 @@
     });
   }
 
+  function join(team: TeamChoice) {
+    game?.send({ type: "join", nickname, team });
+  }
+
+  function createTeam(event: SubmitEvent) {
+    event.preventDefault();
+    join({ create: teamName });
+  }
+
   function answer(choiceIndex: number) {
-    const stage = game?.view?.stage;
+    const stage = view?.stage;
     if (stage?.phase === "question") game?.send({ type: "answer", questionId: stage.question.questionId, choiceIndex });
   }
 
-  const ordinal = (rank: number) => (rank === 1 ? "1er" : `${String(rank)}e`);
+  const ordinal = (rank: number, feminine: boolean) => (rank === 1 ? (feminine ? "1re" : "1er") : `${String(rank)}e`);
 </script>
 
 <main>
@@ -52,16 +70,45 @@
     <p class="screen">{errorMessage("kicked")}</p>
   {:else if view}
     {@const stage = view.stage}
+    {@const teams = view.mode === "teams"}
+    {@const captain = view.team.captain === view.nickname}
     {#if game?.status === "reconnecting"}<p class="banner" role="status">Connexion perdue, reconnexion…</p>{/if}
     <header>
-      <strong>{view.nickname}</strong>
+      <p class="me">
+        <strong>{view.nickname}</strong>
+        {#if teams}· {view.team.name}{#if captain} (capitaine){/if}{/if}
+      </p>
       {#if stage.phase === "question"}<Countdown deadline={stage.question.deadline} offset={game?.clockOffset ?? 0} />{/if}
     </header>
 
     {#if stage.phase === "lobby"}
       <p class="screen">C'est bon, tu es dans la partie ! Regarde l'écran : ça va commencer.</p>
+      {#if teams}
+        <p class="score">
+          {captain ? "Tu es capitaine : c'est toi qui réponds pour l'équipe." : `${view.team.captain} répond pour l'équipe.`}
+        </p>
+      {/if}
     {:else if stage.phase === "question"}
-      {#if stage.answered}
+      {#if !captain}
+        <p class="text">{stage.question.text}</p>
+        <ul class="answers">
+          {#each stage.question.choices as choice, index (index)}
+            {@const locked = stage.teamAnswer !== undefined}
+            <li
+              style:--color="var(--choice-{index})"
+              class={{ picked: stage.teamAnswer === index, faded: locked && stage.teamAnswer !== index }}
+            >
+              <ChoiceShape {index} size="2.5rem" />
+              <span>{choice}</span>
+              {#if stage.teamAnswer === index}<strong class="pick">Choix de l'équipe</strong>{/if}
+            </li>
+          {/each}
+        </ul>
+        <p class="score">
+          {view.team.captain}
+          {stage.teamAnswer === undefined ? "répond pour l'équipe : discutez-en !" : "a répondu pour l'équipe."}
+        </p>
+      {:else if stage.answered}
         <p class="screen">Réponse envoyée ! Attends les autres…</p>
       {:else}
         <p class="text">{stage.question.text}</p>
@@ -86,14 +133,16 @@
       {:else}
         <p class="screen bad">Raté…</p>
       {/if}
-      <p class="score">Score : {stage.you?.score ?? 0}</p>
+      <p class="score">{teams ? "Score de l'équipe" : "Score"} : {stage.you?.score ?? 0}</p>
     {:else if stage.phase === "leaderboard"}
       <p class="screen">
-        {#if stage.you}Tu es <strong>{ordinal(stage.you.rank)}</strong> avec {stage.you.score} points{:else}Regarde le classement à l'écran{/if}
+        {#if stage.you}
+          {teams ? "Ton équipe est" : "Tu es"} <strong>{ordinal(stage.you.rank, teams)}</strong> avec {stage.you.score} points
+        {:else}Regarde le classement à l'écran{/if}
       </p>
     {:else}
       <h1>Podium</h1>
-      <Standings standings={stage.podium} highlight={view.nickname} />
+      <Standings standings={stage.podium} highlight={view.team.name} />
       <p class="score">Merci d'avoir joué !</p>
     {/if}
 
@@ -104,10 +153,37 @@
           location.reload();
         }}>Recharger</button
       ></p>
+  {:else if visitor}
+    <section class="teams">
+      <h1>Choisis ton équipe</h1>
+      {#if visitor.teams.length > 0}
+        <ul>
+          {#each visitor.teams as team (team.teamId)}
+            <li>
+              <button
+                disabled={game?.status !== "open"}
+                onclick={() => {
+                  join({ join: team.teamId });
+                }}>{team.name}</button
+              >
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p>Aucune équipe pour l'instant.</p>
+      {/if}
+      {#if visitor.canCreateTeam}
+        <form onsubmit={createTeam}>
+          <label>Nouvelle équipe <input bind:value={teamName} maxlength="24" required autocomplete="off" /></label>
+          <button class="primary" disabled={game?.status !== "open"}>Créer l'équipe</button>
+        </form>
+      {/if}
+      {#if game?.error}<p class="error" role="alert">{errorMessage(game.error)}</p>{/if}
+    </section>
   {:else if game && !game.error}
     <p class="screen">Connexion…</p>
   {:else}
-    <form onsubmit={join}>
+    <form onsubmit={lookup}>
       <h1>Rejoindre une partie</h1>
       <label>
         Code de la partie
@@ -136,6 +212,10 @@
     align-items: center;
     justify-content: space-between;
     min-height: 3rem;
+  }
+
+  .me {
+    margin: 0;
   }
 
   .screen {
@@ -171,9 +251,13 @@
   .answers {
     display: grid;
     gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  .answers button {
+  .answers button,
+  .answers li {
     display: flex;
     align-items: center;
     gap: 1rem;
@@ -188,6 +272,54 @@
 
   .answers button:active {
     transform: scale(0.98);
+  }
+
+  .answers li {
+    border-radius: var(--radius);
+    background: var(--surface);
+    transition: opacity 0.3s;
+  }
+
+  .answers li.picked {
+    outline: 3px solid var(--brand);
+  }
+
+  .answers li.faded {
+    opacity: 0.45;
+  }
+
+  .pick {
+    margin-left: auto;
+    font-size: 0.9rem;
+  }
+
+  .teams {
+    display: grid;
+    gap: 1rem;
+    margin-top: 10vh;
+  }
+
+  .teams h1 {
+    margin: 0;
+    color: var(--brand);
+  }
+
+  .teams ul {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .teams li button {
+    width: 100%;
+    padding-block: 0.9rem;
+    font-size: 1.15rem;
+  }
+
+  .teams form {
+    margin-top: 0.5rem;
   }
 
   form {

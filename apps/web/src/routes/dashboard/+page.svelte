@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { api } from "$lib/api";
-  import { CreatedGame, QuizSummary } from "@quorum/protocol";
+  import { CreatedGame, type GameMode, QuizSummary } from "@quorum/protocol";
   import { z } from "zod";
 
   const loadQuizzes = () => api(z.array(QuizSummary), "/quizzes");
@@ -14,8 +14,8 @@
     quizzes = loadQuizzes();
   }
 
-  async function launch(quiz: QuizSummary) {
-    const { gameId } = await api(CreatedGame, "/games", { method: "POST", body: { quizId: quiz.id } });
+  async function launch(quiz: QuizSummary, mode: GameMode) {
+    const { gameId } = await api(CreatedGame, "/games", { method: "POST", body: { quizId: quiz.id, mode } });
     await goto(resolve("/host/[gameId]", { gameId }));
   }
 </script>
@@ -42,7 +42,8 @@
             </p>
           </div>
           <div class="actions">
-            <button class="primary" onclick={() => launch(quiz)}>Lancer</button>
+            <button class="primary" onclick={() => launch(quiz, "solo")}>Lancer</button>
+            <button onclick={() => launch(quiz, "teams")}>Lancer en équipes</button>
             <a href={resolve("/dashboard/quizzes/[id]", { id: quiz.id })}>Modifier</a>
             <button class="danger" onclick={() => remove(quiz)}>Supprimer</button>
           </div>

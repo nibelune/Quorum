@@ -1,6 +1,9 @@
-import type { ServerMessage, Stage } from "@quorum/protocol";
+import type { ServerMessage, Stage, Team } from "@quorum/protocol";
 
-export type View = Extract<ServerMessage, { type: "snapshot" }>["view"];
+type GameInfo = Extract<ServerMessage, { type: "game_info" }>;
+
+// Avant de rejoindre, le joueur est un visiteur : il connaît le mode de la partie et choisit son équipe.
+export type View = Extract<ServerMessage, { type: "snapshot" }>["view"] | ({ role: "visitor" } & Omit<GameInfo, "type">);
 
 export interface ViewState {
   view: View | null;
@@ -11,19 +14,44 @@ export interface ViewState {
 // juste après un `snapshot`, la socket peut recevoir des événements que celui-ci contient déjà.
 export function reduceView(state: ViewState, message: ServerMessage): ViewState {
   if (message.type === "snapshot") return { view: message.view, seq: message.seq };
+  if (message.type === "game_info") {
+    const { mode, teams, canCreateTeam } = message;
+    return { view: { role: "visitor", mode, teams, canCreateTeam }, seq: state.seq };
+  }
   const { view } = state;
   if (!view) return state;
   if ("seq" in message && message.seq <= state.seq) return state;
   const seq = "seq" in message ? message.seq : state.seq;
+  // Le visiteur ne suit que les équipes créées, pour pouvoir rejoindre la sienne.
+  if (view.role === "visitor") {
+    if (message.type !== "player_joined") return state;
+    return { seq, view: { ...view, teams: withTeam(view.teams, message.team) } };
+  }
   const { stage } = view;
 
   switch (message.type) {
-    case "player_joined":
+    case "player_joined": {
       if (view.role !== "host") return state;
-      return { seq, view: { ...view, players: [...view.players, { playerId: message.playerId, nickname: message.nickname }] } };
-    case "player_left":
+      const { playerId, nickname, team } = message;
+      const players = [...view.players, { playerId, nickname, teamId: team.teamId }];
+      return { seq, view: { ...view, teams: withTeam(view.teams, team), players } };
+    }
+    case "player_left": {
       if (view.role !== "host") return state;
-      return { seq, view: { ...view, players: view.players.filter(({ playerId }) => playerId !== message.playerId) } };
+      const players = view.players.filter(({ playerId }) => playerId !== message.playerId);
+      // Une équipe vide disparaît.
+      const teams = view.teams.filter(({ teamId }) => players.some((player) => player.teamId === teamId));
+      return { seq, view: { ...view, teams, players } };
+    }
+    case "captain_changed": {
+      if (view.role !== "player") return state;
+      // La réponse du capitaine exclu est partie avec lui : son successeur répond à son tour.
+      const next = stage.phase === "question" ? { ...stage, answered: false, teamAnswer: undefined } : stage;
+      return { seq, view: { ...view, team: { ...view.team, captain: message.captain }, stage: next } };
+    }
+    case "team_answer_locked":
+      if (stage.phase !== "question") return { seq, view };
+      return { seq, view: { ...view, stage: { ...stage, answered: true, teamAnswer: message.choiceIndex } } };
     case "question_started": {
       const { questionId, text, choices, deadline } = message;
       const question = { questionId, text, choices, deadline };
@@ -55,4 +83,8 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
     case "reload":
       return state;
   }
+}
+
+function withTeam(teams: Team[], team: Team): Team[] {
+  return teams.some(({ teamId }) => teamId === team.teamId) ? teams : [...teams, team];
 }

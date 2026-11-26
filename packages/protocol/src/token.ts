@@ -1,11 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { GameId, PlayerId } from "./domain.ts";
+import { GameId, PlayerId, TeamId } from "./domain.ts";
 
 // Réservé à Node (node:crypto) : exporté par `@quorum/protocol/token`, jamais par l'entrée principale lue par le web.
 export const TokenPayload = z.discriminatedUnion("role", [
   z.object({ role: z.literal("host"), gameId: GameId, exp: z.int() }),
-  z.object({ role: z.literal("player"), gameId: GameId, playerId: PlayerId }),
+  // L'équipe est fixée au `join` : elle figure dans le jeton.
+  z.object({ role: z.literal("player"), gameId: GameId, playerId: PlayerId, teamId: TeamId }),
 ]);
 export type TokenPayload = z.infer<typeof TokenPayload>;
 

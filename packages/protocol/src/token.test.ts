@@ -1,11 +1,16 @@
 import { expect, test } from "vitest";
-import { GameId, PlayerId } from "./domain.ts";
+import { GameId, PlayerId, TeamId } from "./domain.ts";
 import { signToken, type TokenPayload, verifyToken } from "./token.ts";
 
 const secret = "secret-de-test-".padEnd(32, "x");
 const now = 1_000_000;
 const gameId = GameId.parse(crypto.randomUUID());
-const player: TokenPayload = { role: "player", gameId, playerId: PlayerId.parse(crypto.randomUUID()) };
+const player: TokenPayload = {
+  role: "player",
+  gameId,
+  playerId: PlayerId.parse(crypto.randomUUID()),
+  teamId: TeamId.parse(crypto.randomUUID()),
+};
 const host: TokenPayload = { role: "host", gameId, exp: now + 1 };
 
 test.each([player, host])("relit le jeton $role qu'il a signé", (payload) => {

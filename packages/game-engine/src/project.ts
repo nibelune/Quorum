@@ -1,71 +1,101 @@
-import type { PlayerId, ServerMessage, Stage } from "@quorum/protocol";
-import { distribution, podium, pointsFor, questionAt, rankOf, shownQuestion, top } from "./rules.ts";
-import type { GameEvent, GameState } from "./state.ts";
+import type { PlayerId, ServerMessage, Stage, TeamId } from "@quorum/protocol";
+import { captainOf, distribution, podium, pointsFor, questionAt, rankOf, shownQuestion, top } from "./rules.ts";
+import type { GameEvent, GameState, Team } from "./state.ts";
 
-export type Recipient = { role: "host" } | { role: "player"; playerId: PlayerId };
+// Un visiteur a saisi le PIN sans avoir encore rejoint la partie : il ne suit que les équipes, pour choisir la sienne.
+export type Recipient = { role: "host" } | { role: "player"; playerId: PlayerId; teamId: TeamId } | { role: "visitor" };
 
 export function project(event: GameEvent, to: Recipient): ServerMessage | null {
   switch (event.type) {
     case "player_joined":
+      return to.role === "player" ? null : event;
     case "answer_count":
       return to.role === "host" ? event : null;
     case "player_left":
       if (to.role === "host") return event;
-      return to.playerId === event.playerId ? { type: "error", code: "kicked" } : null;
+      return to.role === "player" && to.playerId === event.playerId ? { type: "error", code: "kicked" } : null;
+    case "captain_changed": {
+      const { teamId, ...message } = event;
+      return to.role === "player" && to.teamId === teamId ? message : null;
+    }
+    case "team_answer_locked": {
+      const { teamId, ...message } = event;
+      return to.role === "player" && to.teamId === teamId ? message : null;
+    }
     case "question_started":
     case "game_ended":
-      return event;
+      return to.role === "visitor" ? null : event;
     case "question_ended": {
+      if (to.role === "visitor") return null;
       const { results, ...message } = event;
-      return to.role === "host" ? message : { ...message, you: results[to.playerId] };
+      return to.role === "host" ? message : { ...message, you: results[to.teamId] };
     }
     case "leaderboard": {
+      if (to.role === "visitor") return null;
       const { ranks, ...message } = event;
-      return to.role === "host" ? message : { ...message, you: ranks[to.playerId] };
+      return to.role === "host" ? message : { ...message, you: ranks[to.teamId] };
     }
   }
 }
 
 export function snapshot(state: GameState, to: Recipient): ServerMessage {
-  if (to.role === "host") {
-    const players = state.players.map(({ playerId, nickname }) => ({ playerId, nickname }));
-    return { type: "snapshot", seq: state.seq, view: { role: "host", pin: state.pin, players, stage: stage(state, to) } };
+  const { mode, seq } = state;
+  switch (to.role) {
+    case "visitor": {
+      // En solo, il n'y a pas d'équipe à choisir : chaque joueur crée la sienne.
+      const choosing = mode === "teams";
+      return {
+        type: "game_info",
+        mode,
+        teams: choosing ? state.teams.map(teamRef) : [],
+        canCreateTeam: choosing && state.current.phase === "lobby",
+      };
+    }
+    case "host": {
+      const { pin, players } = state;
+      return { type: "snapshot", seq, view: { role: "host", mode, pin, teams: state.teams.map(teamRef), players, stage: stage(state) } };
+    }
+    case "player": {
+      const player = state.players.find(({ playerId }) => playerId === to.playerId);
+      const team = state.teams.find(({ teamId }) => teamId === player?.teamId);
+      const captain = player && captainOf(state, player.teamId);
+      if (!player || !team || !captain) return { type: "error", code: "kicked" };
+      const view = { role: "player", mode, nickname: player.nickname, team: { name: team.name, captain: captain.nickname } } as const;
+      return { type: "snapshot", seq, view: { ...view, stage: stage(state, team) } };
+    }
   }
-  const player = state.players.find(({ playerId }) => playerId === to.playerId);
-  if (!player) return { type: "error", code: "kicked" };
-  return { type: "snapshot", seq: state.seq, view: { role: "player", nickname: player.nickname, stage: stage(state, to) } };
 }
 
-function stage(state: GameState, to: Recipient): Stage {
+function teamRef({ teamId, name }: Team) {
+  return { teamId, name };
+}
+
+// `team` est l'équipe du joueur destinataire, absente pour l'animateur.
+function stage(state: GameState, team?: Team): Stage {
   const { current } = state;
-  const player = to.role === "player" ? state.players.find(({ playerId }) => playerId === to.playerId) : undefined;
   switch (current.phase) {
     case "lobby":
       return { phase: "lobby" };
     case "question": {
       const question = shownQuestion(questionAt(state, current.index), current.startedAt);
-      return player
-        ? { phase: "question", question, answered: current.answers.some(({ playerId }) => playerId === player.playerId) }
-        : { phase: "question", question, answerCount: current.answers.length };
+      if (!team) return { phase: "question", question, answerCount: current.answers.length };
+      const answer = current.answers.find(({ teamId }) => teamId === team.teamId);
+      return { phase: "question", question, answered: answer !== undefined, teamAnswer: answer?.choiceIndex };
     }
     case "reveal": {
       const question = questionAt(state, current.index);
-      const answer = current.answers.find(({ playerId }) => playerId === player?.playerId);
+      const answer = current.answers.find(({ teamId }) => teamId === team?.teamId);
       return {
         phase: "reveal",
         question: shownQuestion(question, current.startedAt),
         correctIndex: question.correctIndex,
         distribution: distribution(question, current.answers),
-        you: player && { points: pointsFor(question, current.startedAt, answer), score: player.score },
+        you: team && { points: pointsFor(question, current.startedAt, answer), score: team.score },
       };
     }
     case "leaderboard":
-      return {
-        phase: "leaderboard",
-        top: top(state.players),
-        you: player && { rank: rankOf(state.players, player), score: player.score },
-      };
+      return { phase: "leaderboard", top: top(state.teams), you: team && { rank: rankOf(state.teams, team), score: team.score } };
     case "ended":
-      return { phase: "ended", podium: podium(state.players) };
+      return { phase: "ended", podium: podium(state.teams) };
   }
 }

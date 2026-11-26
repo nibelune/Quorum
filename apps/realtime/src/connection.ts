@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { type Command, snapshot } from "@quorum/game-engine";
-import { ClientMessage, type ErrorCode, GameId, PlayerId, PROTOCOL_VERSION } from "@quorum/protocol";
+import { ClientMessage, type ErrorCode, GameId, PlayerId, PROTOCOL_VERSION, TeamId } from "@quorum/protocol";
 import { signToken, verifyToken } from "@quorum/protocol/token";
 import type { RawData, WebSocket } from "ws";
 import {
@@ -96,27 +96,37 @@ async function handleMessage(node: Node, client: Client, data: RawData): Promise
     case "ping":
       send(client, { type: "pong", t: message.t, serverTime: now });
       return;
-    case "join": {
+    case "lookup": {
       if (identity || client.joining) {
         fail(client, "forbidden");
         return;
       }
-      const limitKey = `ratelimit:join:${client.ip}`;
+      const limitKey = `ratelimit:lookup:${client.ip}`;
       if (Number(await deps.redis.get(limitKey)) >= UNKNOWN_PINS_PER_MINUTE) {
         fail(client, "rate_limited");
         return;
       }
       const gameId = GameId.safeParse(await deps.redis.get(`pin:${message.pin}`));
-      const game = gameId.success ? await ensureGame(node, gameId.data) : null;
-      if (!game) {
+      if (!gameId.success || !(await ensureGame(node, gameId.data))) {
         await deps.redis.incr(limitKey);
         await deps.redis.expire(limitKey, 60, "NX");
         fail(client, "game_not_found");
         return;
       }
+      await attach(node, client, { role: "visitor", gameId: gameId.data });
+      return;
+    }
+    case "join": {
+      if (identity?.role !== "visitor" || client.joining) {
+        fail(client, "forbidden");
+        return;
+      }
+      const { gameId } = identity;
+      const { nickname, team } = message;
       const playerId = PlayerId.parse(randomUUID());
-      client.joining = { gameId: game.id, playerId };
-      await addCommand(deps, game.id, { type: "join", at: now, playerId, nickname: message.nickname }, client);
+      const newTeamId = TeamId.parse(randomUUID());
+      client.joining = { gameId, playerId, teamId: team && "join" in team ? team.join : newTeamId };
+      await addCommand(deps, gameId, { type: "join", at: now, playerId, nickname, newTeamId, team }, client);
       return;
     }
     case "answer": {
@@ -151,6 +161,7 @@ async function handleMessage(node: Node, client: Client, data: RawData): Promise
 }
 
 // Réponse du coordinateur à une commande de ce nœud : un refus, ou l'acceptation d'un `join`.
+// Un visiteur dont le `join` est refusé le reste : il peut réessayer, et la liste des équipes reste à jour.
 export async function handleReply(node: Node, { connId, result }: Reply): Promise<void> {
   const client = node.clients.get(connId);
   if (!client) return;
@@ -158,7 +169,6 @@ export async function handleReply(node: Node, { connId, result }: Reply): Promis
   client.joining = undefined;
   if (!result.ok) {
     fail(client, result.error);
-    if (joining) await leave(node, client, joining.gameId);
     return;
   }
   if (!joining) return;
@@ -175,7 +185,11 @@ async function attach(node: Node, client: Client, identity: Identity, lastSeq?: 
   }
   const recipient = recipientOf(identity);
   client.identity = identity;
-  client.log = client.log.child(recipient.role === "player" ? { gameId: game.id, playerId: recipient.playerId } : { gameId: game.id });
+  client.log = node.deps.logger.child({
+    connId: client.id,
+    gameId: game.id,
+    ...(recipient.role === "player" && { playerId: recipient.playerId }),
+  });
   if (lastSeq !== undefined) {
     // Reconnexion : la diffusion lui renvoie les événements manqués, ou un snapshot s'ils ont été purgés du stream.
     client.position = lastSeq;
@@ -195,7 +209,8 @@ async function attach(node: Node, client: Client, identity: Identity, lastSeq?: 
   if (message.type === "error") client.socket.close();
 }
 
-async function leave(node: Node, client: Client, gameId = client.identity?.gameId): Promise<void> {
+async function leave(node: Node, client: Client): Promise<void> {
+  const gameId = client.identity?.gameId;
   const game = gameId && (await node.games.get(gameId));
   if (!game) return;
   game.clients.delete(client);

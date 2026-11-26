@@ -7,6 +7,8 @@ const CLOCK_SAMPLES = 5;
 interface Options {
   token?: string | undefined;
   onOpen?: (game: GameConnection) => void;
+  // Réponse à `lookup` : le joueur sait s'il doit choisir une équipe avant de rejoindre.
+  onGameInfo?: (game: GameConnection, info: Extract<ServerMessage, { type: "game_info" }>) => void;
   onWelcome?: (token: string) => void;
   onError?: (code: ErrorCode) => void;
   // Écran projeté : redemande un jeton animateur à l'API quand le sien a expiré.
@@ -56,7 +58,9 @@ export class GameConnection {
       const first = this.status === "connecting";
       this.status = "open";
       this.#attempt = 0;
-      this.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, token: this.#token, lastSeq: this.view ? this.#seq : undefined });
+      // Un visiteur accepté juste avant la coupure n'a pas encore de vue de joueur : il repart d'un snapshot.
+      const lastSeq = this.view && this.view.role !== "visitor" ? this.#seq : undefined;
+      this.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, token: this.#token, lastSeq });
       if (this.#pendingAnswer) socket.send(this.#pendingAnswer);
       this.#clockSamples = [];
       this.#ping();
@@ -91,6 +95,7 @@ export class GameConnection {
       this.#options.onWelcome?.(message.token);
     }
     if (message.type === "pong") this.#measure(message.t, message.serverTime);
+    if (message.type === "game_info") this.#options.onGameInfo?.(this, message);
     if (message.type === "answer_received" || message.type === "question_ended") this.#pendingAnswer = null;
     if (message.type === "error") this.#fail(message.code);
     ({ view: this.view, seq: this.#seq } = reduceView({ view: this.view, seq: this.#seq }, message));

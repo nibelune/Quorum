@@ -49,16 +49,27 @@ export async function createQuiz(host: Page): Promise<void> {
   await expect(host.getByRole("heading", { name: "Géographie" })).toBeVisible();
 }
 
-export async function launchGame(host: Page): Promise<string> {
-  await host.getByRole("button", { name: "Lancer", exact: true }).click();
+export async function launchGame(host: Page, button: "Lancer" | "Lancer en équipes" = "Lancer"): Promise<string> {
+  await host.getByRole("button", { name: button, exact: true }).click();
   return (await host.getByText(/^\d{6}$/).textContent()) ?? "";
 }
 
-export async function joinGame(browser: Browser, pin: string, nickname: string): Promise<Page> {
+export async function enterPin(browser: Browser, pin: string, nickname: string): Promise<Page> {
   const player = await newPage(browser);
   await player.goto(`/play?pin=${pin}`);
   await player.getByLabel("Pseudo").fill(nickname);
   await player.getByRole("button", { name: "Rejoindre" }).click();
+  return player;
+}
+
+// En mode équipes, `team` est le nom de l'équipe à créer ou à rejoindre.
+export async function joinGame(browser: Browser, pin: string, nickname: string, team?: { create: string } | { join: string }) {
+  const player = await enterPin(browser, pin, nickname);
+  if (team && "create" in team) {
+    await player.getByLabel("Nouvelle équipe").fill(team.create);
+    await player.getByRole("button", { name: "Créer l'équipe" }).click();
+  }
+  if (team && "join" in team) await player.getByRole("button", { name: team.join, exact: true }).click();
   await expect(player.getByText("tu es dans la partie")).toBeVisible();
   return player;
 }

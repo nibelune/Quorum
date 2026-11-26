@@ -1,4 +1,4 @@
-import { PlayerId, Question } from "@quorum/protocol";
+import { type GameMode, PlayerId, Question, TeamId } from "@quorum/protocol";
 import { reduce } from "./reduce.ts";
 import { type Command, createGame, type GameEvent, type GameState } from "./state.ts";
 
@@ -23,8 +23,40 @@ export const flatEarth = Question.parse({
 export const alice = PlayerId.parse(crypto.randomUUID());
 export const bob = PlayerId.parse(crypto.randomUUID());
 export const carol = PlayerId.parse(crypto.randomUUID());
+export const dave = PlayerId.parse(crypto.randomUUID());
 
-export const join = (playerId: PlayerId, nickname: string): Command => ({ type: "join", at: T0, playerId, nickname });
+export const red = TeamId.parse(crypto.randomUUID());
+export const blue = TeamId.parse(crypto.randomUUID());
+export const green = TeamId.parse(crypto.randomUUID());
+
+// En solo, chaque joueur crée son équipe : dans les tests, elle reprend son identifiant.
+export const soloTeam = (playerId: PlayerId): TeamId => TeamId.parse(playerId);
+
+export const join = (playerId: PlayerId, nickname: string): Command => ({
+  type: "join",
+  at: T0,
+  playerId,
+  nickname,
+  newTeamId: soloTeam(playerId),
+});
+
+export const createTeam = (playerId: PlayerId, nickname: string, teamId: TeamId, name: string): Command => ({
+  type: "join",
+  at: T0,
+  playerId,
+  nickname,
+  newTeamId: teamId,
+  team: { create: name },
+});
+
+export const joinTeam = (playerId: PlayerId, nickname: string, teamId: TeamId): Command => ({
+  type: "join",
+  at: T0,
+  playerId,
+  nickname,
+  newTeamId: TeamId.parse(crypto.randomUUID()),
+  team: { join: teamId },
+});
 
 export const answer = (playerId: PlayerId, choiceIndex: number, at = T0, questionId = capital.id): Command => ({
   type: "answer",
@@ -38,8 +70,17 @@ export const kick = (playerId: PlayerId): Command => ({ type: "kick", at: T0, pl
 
 export const host = (type: "start" | "next" | "end" | "tick", at = T0): Command => ({ type, at });
 
-export function play(...commands: Command[]): { state: GameState; events: GameEvent[] } {
-  let state = createGame("123456", [capital, flatEarth]);
+export interface Game {
+  state: GameState;
+  events: GameEvent[];
+}
+
+export const play = (...commands: Command[]): Game => replay("solo", commands);
+
+export const playTeams = (...commands: Command[]): Game => replay("teams", commands);
+
+function replay(mode: GameMode, commands: Command[]): Game {
+  let state = createGame("123456", [capital, flatEarth], mode);
   const events: GameEvent[] = [];
   for (const command of commands) {
     const result = reduce(state, command);
