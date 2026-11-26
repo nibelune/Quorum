@@ -1,0 +1,108 @@
+:root {
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ink: #1d1e3a;
+  --ink-muted: #5d6080;
+  --surface: #ffffff;
+  --background: #f4f4fb;
+  --line: #dcdcea;
+  --brand: #2b2d6e;
+  --brand-ink: #ffffff;
+  --accent: #f5b83d;
+  --danger: #b3261e;
+  --success: #1e7d4f;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 6px 20px rgb(29 30 58 / 8%);
+
+  /* Palette Okabe-Ito, lisible par les daltoniens. Une couleur de choix est toujours associée à une forme. */
+  --choice-0: #e69f00;
+  --choice-1: #56b4e9;
+  --choice-2: #009e73;
+  --choice-3: #cc79a7;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--background);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.6rem 1.1rem;
+  font-weight: 600;
+}
+
+button.primary {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+
+button.danger {
+  color: var(--danger);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) / 1.5);
+  background: var(--surface);
+  padding: 0.6rem 0.8rem;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+label {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+
+.error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

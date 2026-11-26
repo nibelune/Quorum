@@ -1,0 +1,2 @@
+// Types globaux de SvelteKit : https://svelte.dev/docs/kit/types#app.d.ts
+export {};

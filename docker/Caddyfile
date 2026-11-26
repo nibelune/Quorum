@@ -5,4 +5,7 @@
 	handle /ws {
 		reverse_proxy realtime:3000
 	}
+	handle {
+		reverse_proxy web:3000
+	}
 }

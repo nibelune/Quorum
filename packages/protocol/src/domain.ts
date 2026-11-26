@@ -16,7 +16,7 @@ export const Pin = z.string().regex(/^\d{6}$/);
 
 export const Nickname = z.string().trim().min(1).max(20);
 
-const MAX_CHOICES = 4;
+export const MAX_CHOICES = 4;
 
 export const ChoiceIndex = z.int().min(0).max(MAX_CHOICES - 1);
 
