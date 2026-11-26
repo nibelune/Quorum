@@ -18,14 +18,13 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 
 ## Phase 2 : multi-serveurs
 
-- [ ] Lease, fencing token, reprise par un autre nœud
+- [x] Lease, fencing token, reprise par un autre nœud
+- [ ] `realtime` à 3 répliques dans le Compose, arrêt progressif (`SIGTERM`, code 1012)
 - [ ] Reconnexion client avec backoff, rejeu par `lastSeq`, repli sur `snapshot`
-- [ ] Synchronisation d'horloge par `ping`/`pong`
-- [ ] Arrêt progressif (`SIGTERM`, code 1012)
-- [ ] `realtime` à 3 répliques dans le Compose
 - [ ] `make chaos` : test automatisé qui tue un nœud en pleine partie et vérifie que la partie se termine normalement
+- [ ] Synchronisation d'horloge par `ping`/`pong`
+- [ ] Mise en ligne sur Railway (un Dockerfile par app, HTTPS, `realtime` en 3 répliques) : première démo en ligne
 - [ ] Mode équipes : moteur (équipes, capitaine, score d'équipe), protocole (`lookup`, `team_answer_locked`...), écrans (choix de l'équipe au `join`, choix du capitaine visible par l'équipe, classement par équipes), e2e avec deux équipes
-- [ ] `compose.prod.yaml` + déploiement sur un VPS, avec Caddy en HTTPS automatique : première démo en ligne
 
 ## Phase 3 : produit
 

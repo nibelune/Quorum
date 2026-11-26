@@ -20,21 +20,24 @@ export const question = Question.parse({
   durationSec: 5,
 });
 
-export async function startTestNode() {
+export async function startTestNode({ leaseMs = 600 } = {}) {
   const redis = new Redis(TEST_REDIS_URL);
+  const nodeId = `test-${crypto.randomUUID()}`;
   let offset = 0;
   const node = startNode({
     redis,
-    nodeId: `test-${crypto.randomUUID()}`,
+    nodeId,
     publicOrigin: ORIGIN,
     sessionSecret: SECRET,
     now: () => Date.now() + offset,
     logger: pino({ level: "silent" }),
+    leaseMs,
   });
   await new Promise<void>((resolve) => node.server.listen(0, resolve));
   const address = node.server.address();
   if (!address || typeof address === "string") throw new Error("Le serveur de test n'écoute pas sur un port");
   return {
+    nodeId,
     url: `ws://localhost:${String(address.port)}/ws`,
     redis,
     advanceClock(ms: number) {

@@ -18,6 +18,7 @@ const node = startNode({
   sessionSecret: env.SESSION_SECRET,
   now: () => Date.now(),
   logger,
+  leaseMs: 5000,
 });
 
 node.server.listen(3000, () => {

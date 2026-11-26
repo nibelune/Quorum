@@ -7,8 +7,9 @@ import type { WebSocket } from "ws";
 import { z } from "zod";
 
 export const GAME_TTL_SECONDS = 2 * 60 * 60;
-const TICK_MS = 250;
 const BLOCK_MS = 200;
+
+const RELEASE_SCRIPT = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) end return 0`;
 
 export interface Deps {
   redis: Redis;
@@ -17,6 +18,8 @@ export interface Deps {
   sessionSecret: string;
   now: () => number;
   logger: Logger;
+  // Durée de vie du lease de coordination (5 s en production, plus courte dans les tests).
+  leaseMs: number;
 }
 
 export type Identity = { role: "host"; gameId: GameId } | { role: "player"; gameId: GameId; playerId: PlayerId };
@@ -34,13 +37,19 @@ export interface Client {
   queue: Promise<void>;
 }
 
-// Phase 1 : un nœud coordonne et diffuse toutes les parties dont il sert un client (le lease arrive en phase 2).
+// Le nœud détient le lease de la partie : il applique les commandes et garde l'état en mémoire.
+export interface Coordination {
+  lease: string;
+  state: GameState;
+  tick: NodeJS.Timeout | undefined;
+}
+
+// Une partie dont le nœud sert au moins un client. Il diffuse ses événements, et la coordonne s'il obtient le lease.
 export interface LocalGame {
   id: GameId;
-  state: GameState;
   clients: Map<Client, Recipient>;
   cursor: string;
-  tick: NodeJS.Timeout | undefined;
+  coordination: Coordination | null;
   log: Logger;
 }
 
@@ -67,6 +76,8 @@ export function keys(gameId: GameId) {
     events: `game:${gameId}:events`,
     commands: `game:${gameId}:commands`,
     owner: `game:${gameId}:owner`,
+    lease: `game:${gameId}:lease`,
+    fence: `game:${gameId}:fence`,
   };
 }
 
@@ -102,34 +113,38 @@ export function ensureGame(node: Node, gameId: GameId): Promise<LocalGame | null
 }
 
 async function loadGame(node: Node, gameId: GameId): Promise<LocalGame | null> {
-  const state = GameState.safeParse(parseJson((await node.deps.redis.get(keys(gameId).state)) ?? undefined));
-  if (!state.success) return null;
+  const state = await readState(node.deps, gameId);
+  if (!state) return null;
   const log = node.deps.logger.child({ gameId });
-  const game: LocalGame = { id: gameId, state: state.data, clients: new Map(), cursor: `${String(state.data.seq)}-0`, tick: undefined, log };
-  scheduleTicks(node.deps, game);
-  log.info("partie prise en charge");
-  return game;
+  log.info("partie servie");
+  return { id: gameId, clients: new Map(), cursor: `${String(state.seq)}-0`, coordination: null, log };
 }
 
-export function release(node: Node, game: LocalGame): void {
+export async function readState(deps: Deps, gameId: GameId): Promise<GameState | null> {
+  const state = GameState.safeParse(parseJson((await deps.redis.get(keys(gameId).state)) ?? undefined));
+  return state.success ? state.data : null;
+}
+
+// Le coordinateur a l'état le plus récent en mémoire ; les autres nœuds le lisent dans Redis.
+export async function currentState(deps: Deps, game: LocalGame): Promise<GameState | null> {
+  return game.coordination?.state ?? readState(deps, game.id);
+}
+
+export function dropCoordination(game: LocalGame, reason: string): void {
+  if (!game.coordination) return;
+  clearInterval(game.coordination.tick);
+  game.coordination = null;
+  game.log.info(reason);
+}
+
+// Plus aucun client ici : le nœud cesse de servir la partie et relâche son lease, qu'un autre nœud peut reprendre aussitôt.
+export async function release(node: Node, game: LocalGame): Promise<void> {
   const joining = [...node.clients.values()].some((client) => client.joining?.gameId === game.id);
   if (game.clients.size > 0 || joining) return;
-  clearInterval(game.tick);
   node.games.delete(game.id);
-  game.log.info("partie libérée");
-}
-
-export function scheduleTicks(deps: Deps, game: LocalGame): void {
-  if (game.state.current.phase !== "question") {
-    clearInterval(game.tick);
-    game.tick = undefined;
-    return;
-  }
-  game.tick ??= setInterval(() => {
-    addCommand(deps, game.id, { type: "tick", at: deps.now() }).catch((error: unknown) => {
-      game.log.error({ err: error }, "tick non envoyé");
-    });
-  }, TICK_MS);
+  const lease = game.coordination?.lease;
+  dropCoordination(game, "partie libérée");
+  if (lease) await node.deps.redis.eval(RELEASE_SCRIPT, 1, keys(game.id).lease, lease);
 }
 
 export async function localGames(node: Node): Promise<LocalGame[]> {

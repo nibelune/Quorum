@@ -114,6 +114,7 @@ Le chrono passe par le même chemin : pendant une question, le coordinateur ajou
 - Le lease `game:{id}:lease` vaut `{nodeId}:{token}` et expire au bout de 5 s (`SET NX PX`). Il est renouvelé toutes les 1,5 s. Le token provient de `INCR game:{id}:fence` (fencing token).
 - Tout nœud qui sert un client d'une partie sans coordinateur tente d'acquérir le lease. Le gagnant charge l'état, applique les commandes restées dans le stream, puis reprend les `tick`.
 - Un ancien coordinateur (pause GC, coupure réseau) ne peut plus rien écrire : `commit` rejette son token.
+- Un nœud qui ne sert plus aucun client d'une partie relâche son lease (seulement si le token correspond) : un autre nœud la reprend aussitôt, sans attendre l'expiration.
 
 ### Diffusion
 

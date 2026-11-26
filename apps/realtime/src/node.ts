@@ -49,7 +49,7 @@ export function startNode(deps: Deps): RealtimeNode {
       wss.close();
       server.close();
       await Promise.all(stops.map((stop) => stop()));
-      for (const game of await localGames(node)) clearInterval(game.tick);
+      for (const game of await localGames(node)) clearInterval(game.coordination?.tick);
       replies.disconnect();
     },
   };

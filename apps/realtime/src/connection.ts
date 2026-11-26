@@ -7,6 +7,7 @@ import type { RawData, WebSocket } from "ws";
 import {
   addCommand,
   type Client,
+  currentState,
   ensureGame,
   type Identity,
   type Node,
@@ -172,8 +173,14 @@ async function attach(node: Node, client: Client, identity: Identity): Promise<v
   const recipient = recipientOf(identity);
   client.identity = identity;
   client.log = client.log.child(recipient.role === "player" ? { gameId: game.id, playerId: recipient.playerId } : { gameId: game.id });
+  // Ajoutée avant la lecture de l'état : aucun événement postérieur au snapshot ne peut lui échapper.
   game.clients.set(client, recipient);
-  const message = snapshot(game.state, recipient);
+  const state = await currentState(node.deps, game);
+  if (!state) {
+    fail(client, "game_not_found");
+    return;
+  }
+  const message = snapshot(state, recipient);
   send(client, message);
   if (message.type === "error") client.socket.close();
 }
@@ -182,7 +189,7 @@ async function leave(node: Node, client: Client, gameId = client.identity?.gameI
   const game = gameId && (await node.games.get(gameId));
   if (!game) return;
   game.clients.delete(client);
-  release(node, game);
+  await release(node, game);
 }
 
 function fail(client: Client, code: ErrorCode): void {
