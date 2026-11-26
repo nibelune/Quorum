@@ -1,3 +1,4 @@
 import { defineConfig } from "vitest/config";
 
-export default defineConfig({ test: { globalSetup: "./src/global-setup.ts" } });
+// Le test de chaos (chaos/) ne tourne que par `make chaos`, sur la pile du Compose.
+export default defineConfig({ test: { include: ["src/**/*.test.ts"], globalSetup: "./src/global-setup.ts" } });

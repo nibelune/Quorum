@@ -47,5 +47,6 @@ jobs:
       - run: pnpm install
       - run: make up
       - run: make e2e
+      - run: make chaos
       - if: failure()
         run: docker compose logs
