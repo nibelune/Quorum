@@ -18,6 +18,8 @@ export class GameConnection {
   error: ErrorCode | null = $state(null);
   #seq = 0;
   #token: string | undefined;
+  // Une réponse envoyée juste avant une coupure peut se perdre : sans accusé de réception, elle est renvoyée après la reconnexion.
+  #pendingAnswer: string | null = null;
   #attempt = 0;
   #stopped = false;
   #options: Options;
@@ -32,7 +34,9 @@ export class GameConnection {
   // Pendant une reconnexion, les écrans désactivent leurs boutons : rien n'est envoyé sur une socket qui n'est pas ouverte.
   send(message: ClientMessage): void {
     this.error = null;
-    if (this.#socket.readyState === WebSocket.OPEN) this.#socket.send(JSON.stringify(message));
+    const text = JSON.stringify(message);
+    if (message.type === "answer") this.#pendingAnswer = text;
+    if (this.#socket.readyState === WebSocket.OPEN) this.#socket.send(text);
   }
 
   close(): void {
@@ -47,6 +51,7 @@ export class GameConnection {
       this.status = "open";
       this.#attempt = 0;
       this.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, token: this.#token, lastSeq: this.view ? this.#seq : undefined });
+      if (this.#pendingAnswer) socket.send(this.#pendingAnswer);
       if (first) this.#options.onOpen?.(this);
     });
     socket.addEventListener("message", (event) => {
@@ -77,11 +82,17 @@ export class GameConnection {
       this.#token = message.token;
       this.#options.onWelcome?.(message.token);
     }
+    if (message.type === "answer_received" || message.type === "question_ended") this.#pendingAnswer = null;
     if (message.type === "error") this.#fail(message.code);
     ({ view: this.view, seq: this.#seq } = reduceView({ view: this.view, seq: this.#seq }, message));
   }
 
   #fail(code: ErrorCode): void {
+    // La réponse renvoyée après une coupure était bien arrivée : c'est une réponse enregistrée, pas une erreur.
+    if (code === "already_answered") {
+      this.#pendingAnswer = null;
+      return;
+    }
     const { refreshToken } = this.#options;
     if (code === "invalid_token" && refreshToken) {
       void refreshToken().then((token) => {

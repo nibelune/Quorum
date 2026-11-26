@@ -37,6 +37,10 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
     case "answer_received":
       if (stage.phase !== "question") return state;
       return { seq, view: { ...view, stage: { ...stage, answered: true } } };
+    // Une réponse renvoyée après une coupure, déjà enregistrée par le serveur.
+    case "error":
+      if (message.code !== "already_answered" || stage.phase !== "question") return state;
+      return { seq, view: { ...view, stage: { ...stage, answered: true } } };
     case "question_ended": {
       if (stage.phase !== "question") return { seq, view };
       const { correctIndex, distribution, you } = message;
@@ -47,7 +51,6 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
     case "game_ended":
       return { seq, view: { ...view, stage: { phase: "ended", podium: message.podium } } };
     case "welcome":
-    case "error":
     case "reload":
       return state;
   }

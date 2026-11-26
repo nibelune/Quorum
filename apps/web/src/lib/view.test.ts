@@ -44,6 +44,11 @@ describe("joueur", () => {
     expect(reduceView(started, { type: "answer_received" }).view?.stage).toMatchObject({ answered: true });
   });
 
+  test("une réponse déjà enregistrée (renvoyée après une coupure) compte comme envoyée", () => {
+    const state = at(inQuestion(player));
+    expect(reduceView(state, { type: "error", code: "already_answered" }).view?.stage).toMatchObject({ answered: true });
+  });
+
   test("la révélation garde la question et donne le résultat du joueur", () => {
     const you = { points: 950, score: 950 };
     const ended = reduceView(at(inQuestion(player)), { type: "question_ended", seq: 2, correctIndex: 0, distribution: [1, 0], you });
