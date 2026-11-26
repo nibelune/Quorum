@@ -6,14 +6,16 @@ const Count = z.int().nonnegative();
 const Score = z.int().nonnegative();
 
 const Player = z.object({ playerId: PlayerId, nickname: Nickname });
-const Standing = z.object({ nickname: Nickname, score: Score });
+export const Standing = z.object({ nickname: Nickname, score: Score });
+export type Standing = z.infer<typeof Standing>;
 
-const ShownQuestion = z.object({
+export const ShownQuestion = z.object({
   questionId: QuestionId,
   text: Question.shape.text,
   choices: Question.shape.choices,
   deadline: z.int(),
 });
+export type ShownQuestion = z.infer<typeof ShownQuestion>;
 
 // Les champs optionnels ne concernent qu'un rôle : `answerCount` l'animateur, `answered` et `you` le joueur.
 const Reveal = {
@@ -39,6 +41,7 @@ const Stage = z.discriminatedUnion("phase", [
   z.object({ phase: z.literal("leaderboard"), ...Leaderboard }),
   z.object({ phase: z.literal("ended"), podium: z.array(Standing) }),
 ]);
+export type Stage = z.infer<typeof Stage>;
 
 const View = z.discriminatedUnion("role", [
   z.object({ role: z.literal("host"), pin: Pin, players: z.array(Player), stage: Stage }),
@@ -55,6 +58,8 @@ export const ErrorCode = z.enum([
   "wrong_phase",
   "already_answered",
   "too_late",
+  "no_players",
+  "kicked",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
