@@ -25,11 +25,13 @@ Ce document décrit le *comment*. Le *pourquoi* des choix est dans `docs/adr/`.
 
 Phases : `lobby` -> `question` -> `reveal` -> `leaderboard` -> (question suivante ou) `ended`
 
+- Une question a un énoncé (300 caractères max), 2 à 4 choix (120 caractères max), une seule bonne réponse et une durée de 5 à 300 s. Une question vrai/faux est un QCM à deux choix.
 - L'animateur crée une partie depuis le dashboard et choisit le mode : `solo` ou `teams`. Un PIN à 6 chiffres et un QR code s'affichent sur l'écran projeté.
 - Les joueurs rejoignent avec un pseudo (1 à 20 caractères, unique dans la partie).
 - Pendant `question`, chaque joueur répond une seule fois. Une réponse compte si elle est reçue avant `deadline + GRACE_MS` (250 ms de tolérance réseau).
 - Pendant `reveal`, on affiche la bonne réponse et la répartition des votes. La bonne réponse n'est **jamais** envoyée avant.
-- `ended` affiche le podium.
+- Pendant `leaderboard`, on affiche les 10 premiers ; chaque joueur voit aussi son rang sur son téléphone.
+- `ended` affiche le podium : les 5 premiers, qui restent à l'écran.
 
 **Score** d'une réponse correcte : `round(1000 * (1 - (tempsDeReponse / dureeQuestion) / 2))`, soit entre 500 et 1000. Réponse fausse, tardive ou absente : 0. Le temps de réponse est mesuré à la réception par le serveur.
 
@@ -74,7 +76,7 @@ Messages JSON validés par zod, union discriminée sur `type`. Taille maximale :
 
 **Serveur -> client**
 - Issus du flux d'événements, avec `seq` : `player_joined`, `player_left`, `team_created`, `captain_changed`, `question_started { questionId, text, choices, deadline }`, `team_answer_locked { choiceIndex }` (équipe concernée uniquement), `answer_count` (animateur), `question_ended { correctIndex, distribution, you? }`, `leaderboard { top, you? }`, `game_ended { podium }`. En mode équipes, `you`, `top` et `podium` portent sur les équipes.
-- Locaux au nœud, sans `seq` : `game_info { mode, teams? }` (réponse à `lookup`), `welcome { playerId, teamId?, role, token }`, `snapshot { seq, view }`, `answer_received`, `pong { t, serverTime }`, `error { code }`, `reload`
+- Locaux au nœud, sans `seq` : `game_info { mode, teams? }` (réponse à `lookup`), `welcome { playerId, teamId?, token }` (réponse à `join`), `snapshot { seq, view }`, `answer_received`, `pong { t, serverTime }`, `error { code }`, `reload`
 
 Si `protocolVersion` ne correspond pas, le serveur répond `reload` : le client recharge la page. Ça évite les incohérences après un déploiement.
 

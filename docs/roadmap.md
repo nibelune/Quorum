@@ -8,10 +8,10 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 
 - [x] Monorepo (`.nvmrc`, `packageManager`, `supportedArchitectures`), `packages/config` (tsconfig, ESLint), Compose de dev (Postgres, Redis), Makefile, `.claude/settings.json` (plugin Svelte)
 - [x] CI GitHub Actions : lint, typecheck, test
-- [ ] `packages/protocol` : messages WebSocket et schémas HTTP
+- [x] `packages/protocol` : messages WebSocket
 - [ ] `packages/game-engine` : `reduce`, `project`, `snapshot`, scores. Chaque transition et chaque règle testées.
 - [ ] `packages/db` + service `migrate` : utilisateurs, quiz, questions
-- [ ] `api` : auth animateur (Better Auth, email + mot de passe), CRUD quiz (QCM, vrai/faux), création de partie + PIN, jeton animateur. Premier service applicatif du Compose : `dev.Dockerfile`, Caddy, `.env.example`
+- [ ] `api` : auth animateur (Better Auth, email + mot de passe), CRUD quiz (QCM, vrai/faux), création de partie + PIN, jeton animateur, schémas HTTP dans `packages/protocol`. Premier service applicatif du Compose : `dev.Dockerfile`, Caddy, `.env.example`
 - [ ] `realtime` : connexion, `hello`, `join`, jetons, chemin commande -> coordinateur -> événements, chrono, rate limits
 - [ ] `web` : dashboard (liste et édition des quiz), écran projeté (lobby avec QR code, question, révélation, classement, podium), app joueur
 - [ ] E2E Playwright : un animateur et trois joueurs jouent une partie complète
