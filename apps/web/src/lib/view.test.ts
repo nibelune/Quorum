@@ -15,7 +15,7 @@ const question: ShownQuestion = {
 };
 
 type JoinedView = Exclude<View, { role: "visitor" }>;
-const host: JoinedView = { role: "host", mode: "teams", pin: "123456", teams: [], players: [], stage: { phase: "lobby" } };
+const host: JoinedView = { role: "host", mode: "teams", pin: "123456", players: [], stage: { phase: "lobby" } };
 const player: JoinedView = { role: "player", mode: "teams", nickname: "Bob", team: { name: "Rouges", captain: "Alice" }, stage: { phase: "lobby" } };
 const at = (view: View, seq = 1): ViewState => ({ view, seq });
 const inQuestion = (view: JoinedView): View =>
@@ -40,21 +40,25 @@ test("un événement déjà couvert par le seq reçu est ignoré", () => {
   expect(reduceView(state, joined(alice, "Alice", 5))).toBe(state);
 });
 
-test("un visiteur voit les équipes de la partie, puis celles qui se créent", () => {
-  const visiting = reduceView({ view: null, seq: 0 }, { type: "game_info", mode: "teams", teams: [], canCreateTeam: true });
-  const created = reduceView(visiting, { type: "team_created", seq: 1, team: reds });
-  expect(created.view).toEqual({ role: "visitor", mode: "teams", teams: [reds], canCreateTeam: true });
+describe("visiteur", () => {
+  const visitor: View = { role: "visitor", mode: "teams", teams: [], canCreateTeam: true };
+
+  test("voit les équipes de la partie, puis celles qui se créent", () => {
+    const created = reduceView(at(visitor), { type: "team_created", seq: 2, team: reds });
+    expect(created.view).toEqual({ ...visitor, teams: [reds] });
+  });
+
+  test("une fois accepté, repart d'une vue vide, que le snapshot suivant remplace", () => {
+    expect(reduceView(at(visitor), { type: "welcome", token: "jeton" })).toEqual({ view: null, seq: 0 });
+  });
 });
 
 describe("animateur", () => {
-  test("voit les joueurs arriver dans leur équipe, et une équipe vide disparaître", () => {
+  test("voit les joueurs arriver avec leur équipe, et partir", () => {
     const withAlice = reduceView(at(host), joined(alice, "Alice", 2));
-    expect(withAlice.view).toMatchObject({ teams: [reds], players: [{ playerId: alice, nickname: "Alice", teamId: reds.teamId }] });
     const withBob = reduceView(withAlice, joined(bob, "Bob", 3));
-    expect(withBob.view).toMatchObject({ teams: [reds] });
-    const withoutAlice = reduceView(withBob, { type: "player_left", seq: 4, playerId: alice });
-    expect(withoutAlice.view).toMatchObject({ teams: [reds], players: [{ playerId: bob }] });
-    expect(reduceView(withoutAlice, { type: "player_left", seq: 5, playerId: bob }).view).toMatchObject({ teams: [], players: [] });
+    expect(withBob.view).toMatchObject({ players: [{ playerId: alice, nickname: "Alice", team: reds }, { playerId: bob }] });
+    expect(reduceView(withBob, { type: "player_left", seq: 4, playerId: alice }).view).toMatchObject({ players: [{ playerId: bob }] });
   });
 
   test("suit le nombre de réponses pendant une question", () => {

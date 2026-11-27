@@ -40,6 +40,9 @@
     send({ type: "kick", playerId });
   }
 
+  // Les joueurs par équipe (un nom est unique dans la partie), chacune dans l'ordre d'arrivée : le premier est le capitaine.
+  const teams = $derived(Map.groupBy(view?.players ?? [], ({ team }) => team.name));
+
   const plural = (count: number, word: string) => `${String(count)} ${word}${count > 1 ? "s" : ""}`;
 
   function end() {
@@ -86,13 +89,12 @@
             </li>
           {/snippet}
           {#if view.mode === "teams"}
-            <h2>{plural(view.teams.length, "équipe")} · {plural(view.players.length, "joueur")}</h2>
-            {#each view.teams as team (team.teamId)}
-              <section class="team" aria-label={team.name}>
-                <h3>{team.name}</h3>
+            <h2>{plural(teams.size, "équipe")} · {plural(view.players.length, "joueur")}</h2>
+            {#each [...teams] as [name, members] (name)}
+              <section class="team" aria-label={name}>
+                <h3>{name}</h3>
                 <ul>
-                  <!-- Le premier membre arrivé est le capitaine. -->
-                  {#each view.players.filter(({ teamId }) => teamId === team.teamId) as player, index (player.playerId)}
+                  {#each members as player, index (player.playerId)}
                     {@render chip(player, index === 0)}
                   {/each}
                 </ul>
@@ -126,7 +128,7 @@
           </header>
           <footer>
             {#if stage.phase === "question"}
-              <p>{stage.answerCount ?? 0} / {view.teams.length} {view.mode === "teams" ? "équipes ont répondu" : "réponses"}</p>
+              <p>{stage.answerCount ?? 0} / {teams.size} {view.mode === "teams" ? "équipes ont répondu" : "réponses"}</p>
               <button
                 disabled={game?.status !== "open"}
                 onclick={() => {

@@ -1,14 +1,14 @@
 import { type ClientMessage, type ErrorCode, PROTOCOL_VERSION, ServerMessage } from "@quorum/protocol";
 import { clockOffset, offsetSample } from "./clock.ts";
-import { type GameInfo, reduceView, type View } from "./view.ts";
+import { reduceView, type View } from "./view.ts";
 
 const CLOCK_SAMPLES = 5;
 
 interface Options {
   token?: string | undefined;
   onOpen?: (game: GameConnection) => void;
-  // Réponse à `lookup` : le joueur sait s'il doit choisir une équipe avant de rejoindre.
-  onGameInfo?: (game: GameConnection, info: GameInfo) => void;
+  // Après `lookup`, la vue de visiteur dit au joueur s'il doit choisir une équipe avant de rejoindre.
+  onSnapshot?: (game: GameConnection, view: View) => void;
   onWelcome?: (token: string) => void;
   onError?: (code: ErrorCode) => void;
   // Écran projeté : redemande un jeton animateur à l'API quand le sien a expiré.
@@ -58,9 +58,7 @@ export class GameConnection {
       const first = this.status === "connecting";
       this.status = "open";
       this.#attempt = 0;
-      // Un visiteur accepté juste avant la coupure n'a pas encore de vue de joueur : il repart d'un snapshot.
-      const lastSeq = this.view && this.view.role !== "visitor" ? this.#seq : undefined;
-      this.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, token: this.#token, lastSeq });
+      this.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, token: this.#token, lastSeq: this.view ? this.#seq : undefined });
       if (this.#pendingAnswer) socket.send(this.#pendingAnswer);
       this.#clockSamples = [];
       this.#ping();
@@ -95,7 +93,7 @@ export class GameConnection {
       this.#options.onWelcome?.(message.token);
     }
     if (message.type === "pong") this.#measure(message.t, message.serverTime);
-    if (message.type === "game_info") this.#options.onGameInfo?.(this, message);
+    if (message.type === "snapshot") this.#options.onSnapshot?.(this, message.view);
     if (message.type === "answer_received" || message.type === "question_ended") this.#pendingAnswer = null;
     if (message.type === "error") this.#fail(message.code);
     ({ view: this.view, seq: this.#seq } = reduceView({ view: this.view, seq: this.#seq }, message));

@@ -41,4 +41,5 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 - [ ] OpenTelemetry
 - [ ] Vue ops en direct : nœuds, connexions par nœud, messages par seconde, parties coordonnées par chaque nœud
 - [ ] Test de charge k6 (`make load`) : résultats p50/p95/p99 et nombre de connexions simultanées dans le README
+- [ ] Si le test de charge le justifie : le coordinateur joint le snapshot du joueur à sa réponse au `join` accepté, pour que le nœud n'ait plus à relire l'état dans Redis (une lecture au `lookup`, une autre au `join`)
 - [ ] README vitrine : démo, schéma d'architecture, vidéo du test de chaos

@@ -42,16 +42,17 @@ export function snapshot(state: GameState, to: Recipient): ServerMessage {
     case "visitor": {
       // En solo, il n'y a pas d'équipe à choisir : chaque joueur crée la sienne.
       const choosing = mode === "teams";
-      return {
-        type: "game_info",
-        mode,
-        teams: choosing ? state.teams.map(teamRef) : [],
-        canCreateTeam: choosing && state.current.phase === "lobby",
-      };
+      const teams = choosing ? state.teams.map(teamRef) : [];
+      return { type: "snapshot", seq, view: { role: "visitor", mode, teams, canCreateTeam: choosing && state.current.phase === "lobby" } };
     }
     case "host": {
-      const { pin, players } = state;
-      return { type: "snapshot", seq, view: { role: "host", mode, pin, teams: state.teams.map(teamRef), players, stage: stage(state) } };
+      // Regroupés par équipe, chacune dans l'ordre d'arrivée : le premier membre est le capitaine.
+      const players = state.teams.flatMap((team) =>
+        state.players
+          .filter(({ teamId }) => teamId === team.teamId)
+          .map(({ playerId, nickname }) => ({ playerId, nickname, team: teamRef(team) })),
+      );
+      return { type: "snapshot", seq, view: { role: "host", mode, pin: state.pin, players, stage: stage(state) } };
     }
     case "player": {
       const player = state.players.find(({ playerId }) => playerId === to.playerId);

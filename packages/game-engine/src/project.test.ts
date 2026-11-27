@@ -102,13 +102,9 @@ describe("snapshot", () => {
         role: "host",
         mode: "solo",
         pin: "123456",
-        teams: [
-          { teamId: soloTeam(alice), name: "Alice" },
-          { teamId: soloTeam(bob), name: "Bob" },
-        ],
         players: [
-          { playerId: alice, nickname: "Alice", teamId: soloTeam(alice) },
-          { playerId: bob, nickname: "Bob", teamId: soloTeam(bob) },
+          { playerId: alice, nickname: "Alice", team: { teamId: soloTeam(alice), name: "Alice" } },
+          { playerId: bob, nickname: "Bob", team: { teamId: soloTeam(bob), name: "Bob" } },
         ],
         stage: { phase: "lobby" },
       },
@@ -172,9 +168,16 @@ describe("snapshot", () => {
         { teamId: red, name: "Rouges" },
         { teamId: blue, name: "Bleus" },
       ];
-      const info = { type: "game_info", mode: "teams", teams };
-      expect(snapshot(playTeams(...teamLobby).state, toVisitor)).toEqual({ ...info, canCreateTeam: true });
-      expect(snapshot(playTeams(...teamLobby, host("start")).state, toVisitor)).toEqual({ ...info, canCreateTeam: false });
+      const view = { role: "visitor", mode: "teams", teams };
+      expect(snapshot(playTeams(...teamLobby).state, toVisitor)).toMatchObject({ type: "snapshot", view: { ...view, canCreateTeam: true } });
+      expect(snapshot(playTeams(...teamLobby, host("start")).state, toVisitor)).toMatchObject({ view: { ...view, canCreateTeam: false } });
+    });
+
+    test("regroupe les joueurs par équipe pour l'animateur, chacune dans l'ordre d'arrivée", () => {
+      const { state } = playTeams(createTeam(alice, "Alice", red, "Rouges"), createTeam(carol, "Carol", blue, "Bleus"), joinTeam(bob, "Bob", red));
+      expect(snapshot(state, toHost)).toMatchObject({
+        view: { players: [{ nickname: "Alice", team: { name: "Rouges" } }, { nickname: "Bob", team: { name: "Rouges" } }, { nickname: "Carol" }] },
+      });
     });
 
     test("donne à chaque membre son équipe, son capitaine et le choix de celui-ci", () => {
@@ -186,7 +189,7 @@ describe("snapshot", () => {
   });
 
   test("en solo, ne donne au visiteur aucune équipe à choisir", () => {
-    expect(snapshot(play(...lobby).state, toVisitor)).toEqual({ type: "game_info", mode: "solo", teams: [], canCreateTeam: false });
+    expect(snapshot(play(...lobby).state, toVisitor)).toMatchObject({ view: { role: "visitor", mode: "solo", teams: [], canCreateTeam: false } });
   });
 });
 

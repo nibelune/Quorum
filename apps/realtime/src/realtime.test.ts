@@ -68,8 +68,8 @@ describe("join", () => {
   test("le joueur reçoit son jeton et la vue de la partie, l'animateur le voit arriver", async () => {
     const { pin, hostToken } = await createTestGame(node.redis);
     const host = await connectHost(node.url, hostToken);
-    const { visitor: player, info } = await visit(node.url, pin);
-    expect(info).toEqual({ type: "game_info", mode: "solo", teams: [], canCreateTeam: false });
+    const { visitor: player, view } = await visit(node.url, pin);
+    expect(view).toEqual({ role: "visitor", mode: "solo", teams: [], canCreateTeam: false });
     player.send({ type: "join", nickname: "Alice" });
     expect((await player.receive("welcome")).token).toEqual(expect.any(String));
     expect((await player.receive("snapshot")).view).toEqual({
@@ -177,8 +177,8 @@ describe("partie", () => {
 describe("mode équipes", () => {
   test("le visiteur voit les équipes se créer en direct, puis rejoint la sienne", async () => {
     const { pin } = await createTestGame(node.redis, "teams");
-    const { visitor, info } = await visit(node.url, pin);
-    expect(info).toEqual({ type: "game_info", mode: "teams", teams: [], canCreateTeam: true });
+    const { visitor, view } = await visit(node.url, pin);
+    expect(view).toEqual({ role: "visitor", mode: "teams", teams: [], canCreateTeam: true });
 
     await joinAs(node.url, pin, "Alice", { team: { create: "Rouges" } });
     const { team } = await visitor.receive("team_created");

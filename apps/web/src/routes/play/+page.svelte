@@ -39,8 +39,8 @@
         connection.send({ type: "lookup", pin });
       },
       // En solo, il n'y a pas d'équipe à choisir : le joueur rejoint aussitôt.
-      onGameInfo: (connection, { mode }) => {
-        if (mode === "solo") connection.send({ type: "join", nickname });
+      onSnapshot: (connection, view) => {
+        if (view.role === "visitor" && view.mode === "solo") connection.send({ type: "join", nickname });
       },
       onWelcome: (token) => {
         sessionStorage.setItem(TOKEN_KEY, token);

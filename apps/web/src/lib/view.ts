@@ -1,9 +1,6 @@
-import type { ServerMessage, Stage, Team } from "@quorum/protocol";
+import type { ServerMessage, Stage } from "@quorum/protocol";
 
-export type GameInfo = Extract<ServerMessage, { type: "game_info" }>;
-
-// Avant de rejoindre, le joueur est un visiteur : il connaît le mode de la partie et choisit son équipe.
-export type View = Extract<ServerMessage, { type: "snapshot" }>["view"] | ({ role: "visitor" } & Omit<GameInfo, "type">);
+export type View = Extract<ServerMessage, { type: "snapshot" }>["view"];
 
 export interface ViewState {
   view: View | null;
@@ -14,10 +11,8 @@ export interface ViewState {
 // juste après un `snapshot`, la socket peut recevoir des événements que celui-ci contient déjà.
 export function reduceView(state: ViewState, message: ServerMessage): ViewState {
   if (message.type === "snapshot") return { view: message.view, seq: message.seq };
-  if (message.type === "game_info") {
-    const { mode, teams, canCreateTeam } = message;
-    return { view: { role: "visitor", mode, teams, canCreateTeam }, seq: state.seq };
-  }
+  // Le visiteur accepté change d'identité : sa vue ne vaut plus, le snapshot qui suit la remplace.
+  if (message.type === "welcome") return { view: null, seq: 0 };
   const { view } = state;
   if (!view) return state;
   if ("seq" in message && message.seq <= state.seq) return state;
@@ -33,16 +28,11 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
     case "player_joined": {
       if (view.role !== "host") return state;
       const { playerId, nickname, team } = message;
-      const players = [...view.players, { playerId, nickname, teamId: team.teamId }];
-      return { seq, view: { ...view, teams: withTeam(view.teams, team), players } };
+      return { seq, view: { ...view, players: [...view.players, { playerId, nickname, team }] } };
     }
-    case "player_left": {
+    case "player_left":
       if (view.role !== "host") return state;
-      const players = view.players.filter(({ playerId }) => playerId !== message.playerId);
-      // Une équipe vide disparaît.
-      const teams = view.teams.filter(({ teamId }) => players.some((player) => player.teamId === teamId));
-      return { seq, view: { ...view, teams, players } };
-    }
+      return { seq, view: { ...view, players: view.players.filter(({ playerId }) => playerId !== message.playerId) } };
     case "captain_changed": {
       if (view.role !== "player") return state;
       // La réponse du capitaine exclu est partie avec lui : son successeur répond à son tour.
@@ -79,13 +69,8 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
     case "game_ended":
       return { seq, view: { ...view, stage: { phase: "ended", podium: message.podium } } };
     case "team_created":
-    case "welcome":
     case "pong":
     case "reload":
       return state;
   }
-}
-
-function withTeam(teams: Team[], team: Team): Team[] {
-  return teams.some(({ teamId }) => teamId === team.teamId) ? teams : [...teams, team];
 }

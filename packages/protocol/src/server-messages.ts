@@ -7,7 +7,7 @@ const Score = z.int().nonnegative();
 
 export const Team = z.object({ teamId: TeamId, name: TeamName });
 export type Team = z.infer<typeof Team>;
-const Player = z.object({ playerId: PlayerId, nickname: Nickname, teamId: TeamId });
+const Player = z.object({ playerId: PlayerId, nickname: Nickname, team: Team });
 // Classements et scores portent sur les équipes : en solo, chaque joueur forme une équipe d'un membre, à son nom.
 export const Standing = z.object({ name: TeamName, score: Score });
 export type Standing = z.infer<typeof Standing>;
@@ -50,7 +50,8 @@ const Stage = z.discriminatedUnion("phase", [
 export type Stage = z.infer<typeof Stage>;
 
 const View = z.discriminatedUnion("role", [
-  z.object({ role: z.literal("host"), mode: GameMode, pin: Pin, teams: z.array(Team), players: z.array(Player), stage: Stage }),
+  // Les joueurs de chaque équipe sont dans l'ordre d'arrivée : le premier est le capitaine.
+  z.object({ role: z.literal("host"), mode: GameMode, pin: Pin, players: z.array(Player), stage: Stage }),
   z.object({
     role: z.literal("player"),
     mode: GameMode,
@@ -58,6 +59,8 @@ const View = z.discriminatedUnion("role", [
     team: z.object({ name: TeamName, captain: Nickname }),
     stage: Stage,
   }),
+  // Un joueur qui a trouvé la partie par son PIN (`lookup`) et choisit son équipe. En solo, il n'y en a pas à choisir.
+  z.object({ role: z.literal("visitor"), mode: GameMode, teams: z.array(Team), canCreateTeam: z.boolean() }),
 ]);
 
 export const ErrorCode = z.enum([
@@ -79,7 +82,7 @@ export const ErrorCode = z.enum([
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
 export const ServerMessage = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("player_joined"), seq: Seq, playerId: PlayerId, nickname: Nickname, team: Team }),
+  z.object({ type: z.literal("player_joined"), seq: Seq, ...Player.shape }),
   // Pour les visiteurs : la liste des équipes à rejoindre se met à jour.
   z.object({ type: z.literal("team_created"), seq: Seq, team: Team }),
   z.object({ type: z.literal("captain_changed"), seq: Seq, captain: Nickname }),
@@ -90,8 +93,6 @@ export const ServerMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("question_ended"), seq: Seq, ...Reveal }),
   z.object({ type: z.literal("leaderboard"), seq: Seq, ...Leaderboard }),
   z.object({ type: z.literal("game_ended"), seq: Seq, podium: z.array(Standing) }),
-  // Réponse à `lookup`.
-  z.object({ type: z.literal("game_info"), mode: GameMode, teams: z.array(Team), canCreateTeam: z.boolean() }),
   z.object({ type: z.literal("welcome"), token: z.string() }),
   z.object({ type: z.literal("snapshot"), seq: Seq, view: View }),
   z.object({ type: z.literal("answer_received") }),

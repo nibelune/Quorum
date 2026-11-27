@@ -137,7 +137,7 @@ export async function visit(url: string, pin: string, headers: Record<string, st
   const visitor = await connect(url, headers);
   visitor.send({ type: "hello", protocolVersion: PROTOCOL_VERSION });
   visitor.send({ type: "lookup", pin });
-  return { visitor, info: await visitor.receive("game_info") };
+  return { visitor, view: (await visitor.receive("snapshot")).view };
 }
 
 export async function joinAs(
