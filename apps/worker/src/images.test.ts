@@ -28,6 +28,7 @@ async function upload(createdAt: Date): Promise<string> {
 
 const illustrated = (key: string) =>
   Question.parse({
+    kind: "choice",
     id: crypto.randomUUID(),
     text: "Quelle est cette planète ?",
     choices: ["Saturne", "Jupiter"],

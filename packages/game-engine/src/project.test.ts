@@ -60,7 +60,7 @@ describe("project", () => {
   });
 
   test.each<GameEvent>([
-    { type: "question_started", seq: 3, questionId: capital.id, text: capital.text, choices: capital.choices, deadline: T0 },
+    { type: "question_started", seq: 3, questionId: capital.id, kind: "choice", text: capital.text, choices: capital.choices, deadline: T0 },
     { type: "game_ended", seq: 9, podium: [{ name: "Alice", score: 1000 }] },
   ])("$type va tel quel à l'animateur et aux joueurs", (event) => {
     expect(project(event, toHost)).toBe(event);
@@ -94,7 +94,7 @@ describe("project", () => {
 describe("snapshot", () => {
   const lobby = [join(alice, "Alice"), join(bob, "Bob")];
   const question = [...lobby, host("start"), answer(alice, 1)];
-  const shown = { questionId: capital.id, text: capital.text, choices: capital.choices, deadline: T0 + 20_000 };
+  const shown = { questionId: capital.id, kind: "choice", text: capital.text, choices: capital.choices, deadline: T0 + 20_000 };
 
   test("donne à l'animateur le mode, le PIN, les équipes et les joueurs", () => {
     expect(snapshot(play(...lobby).state, toHost)).toStrictEqual({

@@ -1,10 +1,14 @@
-import { type GameMode, PlayerId, Question, type TeamChoice, TeamId } from "@quorum/protocol";
+import { type GameMode, MultipleChoiceQuestion, PlayerId, Question, QuestionId, type TeamChoice, TeamId } from "@quorum/protocol";
 import { reduce } from "./reduce.ts";
 import { type Command, createGame, type GameEvent, type GameState } from "./state.ts";
 
 export const T0 = 1_000_000;
 
-export const capital = Question.parse({
+// Typées comme des QCM : les tests lisent leur bonne réponse.
+const MultipleChoice = MultipleChoiceQuestion.safeExtend({ id: QuestionId });
+
+export const capital = MultipleChoice.parse({
+  kind: "choice",
   id: crypto.randomUUID(),
   text: "Quelle est la capitale de l'Australie ?",
   choices: ["Sydney", "Canberra", "Melbourne"],
@@ -12,12 +16,21 @@ export const capital = Question.parse({
   durationSec: 20,
 });
 
-export const flatEarth = Question.parse({
+export const flatEarth = MultipleChoice.parse({
+  kind: "choice",
   id: crypto.randomUUID(),
   text: "La Terre est plate.",
   choices: ["Vrai", "Faux"],
   correctIndex: 1,
   durationSec: 10,
+});
+
+export const favourite = Question.parse({
+  kind: "poll",
+  id: crypto.randomUUID(),
+  text: "Quelle planète préférez-vous ?",
+  choices: ["Mars", "Jupiter", "Saturne"],
+  durationSec: 20,
 });
 
 export const alice = PlayerId.parse(crypto.randomUUID());
@@ -70,8 +83,11 @@ export const play = (...commands: Command[]): Game => replay("solo", commands);
 
 export const playTeams = (...commands: Command[]): Game => replay("teams", commands);
 
-function replay(mode: GameMode, commands: Command[]): Game {
-  let state = createGame("123456", [capital, flatEarth], mode, () => 0);
+// Une partie en solo d'une seule question : un sondage.
+export const playPoll = (...commands: Command[]): Game => replay("solo", commands, [favourite]);
+
+function replay(mode: GameMode, commands: Command[], questions: Question[] = [capital, flatEarth]): Game {
+  let state = createGame("123456", questions, mode, () => 0);
   const events: GameEvent[] = [];
   for (const command of commands) {
     const result = reduce(state, command);

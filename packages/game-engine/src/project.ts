@@ -1,5 +1,5 @@
 import type { PlayerId, ServerMessage, Stage, TeamId } from "@quorum/protocol";
-import { captainOf, distribution, podium, pointsFor, questionAt, rankOf, shownQuestion, teamRef, top } from "./rules.ts";
+import { captainOf, correctIndexOf, distribution, podium, pointsFor, questionAt, rankOf, shownQuestion, teamRef, top } from "./rules.ts";
 import type { GameEvent, GameState, Team } from "./state.ts";
 
 // Un visiteur a saisi le PIN sans avoir encore rejoint la partie : il ne suit que les équipes, pour choisir la sienne.
@@ -85,7 +85,7 @@ function stage(state: GameState, team?: Team): Stage {
       return {
         phase: "reveal",
         question: shownQuestion(question, current.startedAt),
-        correctIndex: question.correctIndex,
+        correctIndex: correctIndexOf(question),
         distribution: distribution(question, current.answers),
         you: team && { points: pointsFor(question, current.startedAt, answer), score: team.score },
       };

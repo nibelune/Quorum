@@ -1,6 +1,7 @@
 import type { ErrorCode, TeamId } from "@quorum/protocol";
 import {
   captainOf,
+  correctIndexOf,
   deadlineOf,
   distribution,
   GRACE_MS,
@@ -191,7 +192,7 @@ function endQuestion(state: GameState, round: QuestionRound): ReduceResult {
     {
       type: "question_ended",
       questionId: question.id,
-      correctIndex: question.correctIndex,
+      correctIndex: correctIndexOf(question),
       distribution: distribution(question, round.answers),
       results: Object.fromEntries(scored.map(({ team, points, given }) => [team.teamId, { points, score: team.score, ...given }])),
     },

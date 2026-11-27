@@ -10,7 +10,7 @@ beforeAll(async () => {
 });
 afterAll(() => app.close());
 
-const capital = { text: "Quelle est la capitale de l'Australie ?", choices: ["Sydney", "Canberra"], correctIndex: 1, durationSec: 20 };
+const capital = { kind: "choice" as const, text: "Quelle est la capitale de l'Australie ?", choices: ["Sydney", "Canberra"], correctIndex: 1, durationSec: 20 };
 const input = (title: string, questions: QuizInput["questions"] = [capital]): QuizInput => ({ title, questions });
 
 async function createQuiz(body: QuizInput, as = cookie) {
@@ -24,6 +24,11 @@ test("crée un quiz et attribue un identifiant à chaque nouvelle question", asy
   expect(quiz).toMatchObject({ title: "Capitales", questions: [capital] });
   const read = await app.inject({ url: `/api/quizzes/${quiz.id}`, headers: { cookie } });
   expect(read.json<unknown>()).toEqual(quiz);
+});
+
+test("enregistre un sondage, qui n'a pas de bonne réponse", async () => {
+  const poll = { kind: "poll" as const, text: "Quelle planète préférez-vous ?", choices: ["Mars", "Saturne"], durationSec: 20 };
+  expect(await createQuiz(input("Préférences", [poll]))).toMatchObject({ questions: [poll] });
 });
 
 test("liste les quiz de l'animateur, du plus récemment modifié au plus ancien", async () => {

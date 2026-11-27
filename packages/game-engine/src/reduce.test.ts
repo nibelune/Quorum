@@ -23,6 +23,8 @@ import {
   red,
   soloTeam,
   T0,
+  favourite,
+  playPoll,
 } from "./testing.ts";
 
 const deadline = T0 + capital.durationSec * 1000;
@@ -76,6 +78,7 @@ describe("start", () => {
       type: "question_started",
       seq: 3,
       questionId: capital.id,
+      kind: "choice",
       text: capital.text,
       choices: capital.choices,
       deadline,
@@ -310,5 +313,20 @@ describe("mode équipes", () => {
 
   test("une équipe vide disparaît", () => {
     expect(playTeams(...teamLobby, kick(carol)).state.teams.map(({ teamId }) => teamId)).toEqual([red]);
+  });
+});
+
+test("un sondage compte les votes, sans bonne réponse ni points", () => {
+  const vote = (playerId: typeof alice) => answer(playerId, 2, T0, favourite.id);
+  expect(playPoll(join(alice, "Alice"), join(bob, "Bob"), host("start"), vote(alice), vote(bob)).events.at(-1)).toEqual({
+    type: "question_ended",
+    seq: 4,
+    questionId: favourite.id,
+    correctIndex: undefined,
+    distribution: [0, 0, 2],
+    results: {
+      [soloTeam(alice)]: { points: 0, score: 0, choiceIndex: 2, responseMs: 0 },
+      [soloTeam(bob)]: { points: 0, score: 0, choiceIndex: 2, responseMs: 0 },
+    },
   });
 });

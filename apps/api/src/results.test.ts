@@ -19,8 +19,8 @@ beforeAll(async () => {
     payload: {
       title: "Géographie",
       questions: [
-        { text: "Quelle est la capitale de l'Australie ?", choices: ["Sydney", "Canberra", "Melbourne"], correctIndex: 1, durationSec: 20 },
-        { text: "La Terre est plate.", choices: ["Vrai", "Faux"], correctIndex: 1, durationSec: 10 },
+        { kind: "choice", text: "Quelle est la capitale de l'Australie ?", choices: ["Sydney", "Canberra", "Melbourne"], correctIndex: 1, durationSec: 20 },
+        { kind: "choice", text: "La Terre est plate.", choices: ["Vrai", "Faux"], correctIndex: 1, durationSec: 10 },
       ],
     },
   });
@@ -41,7 +41,7 @@ async function launch(): Promise<GameId> {
 async function finish(gameId: GameId) {
   const [game] = await db.select().from(games).where(eq(games.id, gameId));
   const [capital, flatEarth] = game?.questions ?? [];
-  if (!capital || !flatEarth) throw new Error("Questions manquantes");
+  if (capital?.kind !== "choice" || flatEarth?.kind !== "choice") throw new Error("QCM attendus");
   const [red, blue] = [crypto.randomUUID(), crypto.randomUUID()];
   const wrong = (capital.correctIndex + 1) % capital.choices.length;
   await db.insert(gameTeams).values([

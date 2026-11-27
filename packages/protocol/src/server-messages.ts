@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ChoiceIndex, GameMode, Nickname, Pin, PlayerId, Question, QuestionId, TeamId, TeamName } from "./domain.ts";
+import { ChoiceIndex, Choices, GameMode, ImageUrl, Nickname, Pin, PlayerId, QuestionId, QuestionKind, QuestionText, TeamId, TeamName } from "./domain.ts";
 
 const Seq = z.int().nonnegative();
 const Count = z.int().nonnegative();
@@ -14,16 +14,18 @@ export type Standing = z.infer<typeof Standing>;
 
 export const ShownQuestion = z.object({
   questionId: QuestionId,
-  text: Question.shape.text,
-  choices: Question.shape.choices,
-  imageUrl: Question.shape.imageUrl,
+  kind: QuestionKind,
+  text: QuestionText,
+  choices: Choices,
+  imageUrl: ImageUrl.optional(),
   deadline: z.int(),
 });
 export type ShownQuestion = z.infer<typeof ShownQuestion>;
 
 // Les champs optionnels ne concernent qu'un rôle : `answerCount` l'animateur, `answered`, `teamAnswer` et `you` le joueur.
 const Reveal = {
-  correctIndex: ChoiceIndex,
+  // Absente pour un sondage, qui n'a pas de bonne réponse.
+  correctIndex: ChoiceIndex.optional(),
   distribution: z.array(Count),
   you: z.object({ points: Score, score: Score }).optional(),
 };

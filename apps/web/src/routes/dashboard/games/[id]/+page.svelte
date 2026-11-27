@@ -55,7 +55,7 @@
             <th scope="row">{team.name}</th>
             {#if teams}<td>{team.members.join(", ")}</td>{/if}
             <td>{team.score}</td>
-            <td>{team.correctCount} / {game.questions.length}</td>
+            <td>{team.correctCount} / {game.questions.filter(({ kind }) => kind === "choice").length}</td>
             <td>{seconds(team.averageResponseMs)}</td>
           </tr>
         {/each}
@@ -67,19 +67,26 @@
     <h2>Questions</h2>
     {#each game.questions as question, number (question.id)}
       {@const answered = question.distribution.reduce((total, count) => total + count, 0)}
-      {@const correct = question.distribution[question.correctIndex] ?? 0}
+      <!-- Un sondage n'a pas de bonne réponse. -->
+      {@const correctIndex = question.kind === "choice" ? question.correctIndex : undefined}
+      {@const correct = correctIndex === undefined ? 0 : (question.distribution[correctIndex] ?? 0)}
       <article>
         <h3>{number + 1}. {question.text}</h3>
         <p class="meta">
-          Bonnes réponses : {correct} / {answered} ({share(correct, answered)} %) · temps moyen {seconds(question.averageResponseMs)}
+          {#if correctIndex === undefined}
+            Sondage : {answered} réponse{answered > 1 ? "s" : ""}
+          {:else}
+            Bonnes réponses : {correct} / {answered} ({share(correct, answered)} %)
+          {/if}
+          · temps moyen {seconds(question.averageResponseMs)}
         </p>
         <!-- Formes et couleurs : celles de l'écran projeté, dans l'ordre où les choix y étaient. -->
         <ul class="choices">
           {#each question.choices as choice, index (index)}
             {@const count = question.distribution[index] ?? 0}
-            <li class={{ correct: index === question.correctIndex }}>
+            <li class={{ correct: index === correctIndex }}>
               <ChoiceShape {index} />
-              <span>{choice}{#if index === question.correctIndex}&nbsp;<strong>(bonne réponse)</strong>{/if}</span>
+              <span>{choice}{#if index === correctIndex}&nbsp;<strong>(bonne réponse)</strong>{/if}</span>
               <span class="track"><span style:width="{share(count, answered)}%"></span></span>
               <span class="count">{count}</span>
             </li>

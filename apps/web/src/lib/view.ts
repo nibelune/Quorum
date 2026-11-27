@@ -56,8 +56,8 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
       if (stage.phase !== "question") return { seq, view };
       return { seq, view: { ...view, stage: { ...stage, answered: true, teamAnswer: message.choiceIndex } } };
     case "question_started": {
-      const { questionId, text, choices, imageUrl, deadline } = message;
-      const question = { questionId, text, choices, imageUrl, deadline };
+      const { questionId, kind, text, choices, imageUrl, deadline } = message;
+      const question = { questionId, kind, text, choices, imageUrl, deadline };
       const next: Stage =
         view.role === "host" ? { phase: "question", question, answerCount: 0 } : { phase: "question", question, answered: false };
       return { seq, view: { ...view, stage: next } };

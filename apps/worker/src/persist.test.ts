@@ -24,6 +24,7 @@ afterAll(async () => {
 const T0 = 1_000_000;
 const endedAt = new Date("2026-11-27T20:00:00Z");
 const question = Question.parse({
+  kind: "choice",
   id: crypto.randomUUID(),
   text: "La Terre est ronde.",
   choices: ["Vrai", "Faux"],

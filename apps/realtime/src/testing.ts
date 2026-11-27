@@ -14,6 +14,7 @@ export const ORIGIN = "http://localhost:8080";
 const SECRET = "secret-de-test-".padEnd(32, "x");
 
 export const question = Question.parse({
+  kind: "choice",
   id: crypto.randomUUID(),
   text: "La Terre est ronde.",
   choices: ["Vrai", "Faux"],

@@ -13,10 +13,18 @@ export function questionAt(state: GameState, index: number): Question {
 
 // L'aléa est fourni par l'appelant, comme l'heure : le moteur reste déterministe. `() => 0` garde l'ordre d'origine.
 export function shuffleChoices(question: Question, random: () => number): Question {
-  const remaining = question.choices.map((text, index) => ({ text, correct: index === question.correctIndex }));
+  const remaining = question.choices.map((text, index) => ({ text, index }));
   const shuffled: typeof remaining = [];
   while (remaining.length > 0) shuffled.push(...remaining.splice(Math.floor(random() * remaining.length), 1));
-  return { ...question, choices: shuffled.map(({ text }) => text), correctIndex: shuffled.findIndex(({ correct }) => correct) };
+  const choices = shuffled.map(({ text }) => text);
+  return question.kind === "choice"
+    ? { ...question, choices, correctIndex: shuffled.findIndex(({ index }) => index === question.correctIndex) }
+    : { ...question, choices };
+}
+
+// Un sondage n'a pas de bonne réponse.
+export function correctIndexOf(question: Question): number | undefined {
+  return question.kind === "choice" ? question.correctIndex : undefined;
 }
 
 export function deadlineOf(question: Question, startedAt: number): number {
@@ -26,6 +34,7 @@ export function deadlineOf(question: Question, startedAt: number): number {
 export function shownQuestion(question: Question, startedAt: number): ShownQuestion {
   return {
     questionId: question.id,
+    kind: question.kind,
     text: question.text,
     choices: question.choices,
     ...(question.imageUrl !== undefined && { imageUrl: question.imageUrl }),
@@ -34,7 +43,8 @@ export function shownQuestion(question: Question, startedAt: number): ShownQuest
 }
 
 export function pointsFor(question: Question, startedAt: number, answer: Answer | undefined): number {
-  if (answer?.choiceIndex !== question.correctIndex) return 0;
+  // Un sondage ne rapporte aucun point.
+  if (question.kind !== "choice" || answer?.choiceIndex !== question.correctIndex) return 0;
   const duration = question.durationSec * 1000;
   // Bornée des deux côtés : la tolérance réseau ne coûte pas de points, et un léger décalage d'horloge entre nœuds n'en donne pas.
   const responseTime = Math.min(Math.max(answer.at - startedAt, 0), duration);

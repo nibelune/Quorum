@@ -152,7 +152,8 @@
               style:--color="var(--choice-{index})"
               class={{
                 correct: stage.phase === "reveal" && index === stage.correctIndex,
-                faded: stage.phase === "reveal" && index !== stage.correctIndex,
+                // Un sondage n'a pas de bonne réponse : aucun choix n'est estompé.
+                faded: stage.phase === "reveal" && stage.correctIndex !== undefined && index !== stage.correctIndex,
               }}
             >
               <ChoiceShape {index} size="2.5rem" />

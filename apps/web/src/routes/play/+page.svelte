@@ -139,7 +139,9 @@
         </div>
       {/if}
     {:else if stage.phase === "reveal"}
-      {#if stage.you && stage.you.points > 0}
+      {#if stage.question.kind === "poll"}
+        <p class="screen">Merci pour {teams ? "votre" : "ta"} réponse !</p>
+      {:else if stage.you && stage.you.points > 0}
         <p class="screen good">Bonne réponse !<br /><strong>+{stage.you.points}</strong></p>
       {:else}
         <p class="screen bad">Raté…</p>

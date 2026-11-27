@@ -101,7 +101,7 @@ async function createGame() {
     .map((value) => value.split(";")[0])
     .join("; ");
   const headers = { ...json, cookie };
-  const question = (text: string, correctIndex: number) => ({ text, choices: ["Vrai", "Faux"], correctIndex, durationSec: 20 });
+  const question = (text: string, correctIndex: number) => ({ kind: "choice", text, choices: ["Vrai", "Faux"], correctIndex, durationSec: 20 });
   const quiz = Quiz.parse(
     await (
       await fetch(`${ORIGIN}/api/quizzes`, {

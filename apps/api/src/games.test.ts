@@ -15,7 +15,7 @@ let quiz: Quiz;
 
 beforeAll(async () => {
   cookie = await signUp(app);
-  const question = { text: "Vrai ou faux ?", choices: ["Vrai", "Faux"], correctIndex: 0, durationSec: 10 };
+  const question = { kind: "choice" as const, text: "Vrai ou faux ?", choices: ["Vrai", "Faux"], correctIndex: 0, durationSec: 10 };
   const response = await app.inject({
     method: "POST",
     url: "/api/quizzes",
@@ -50,8 +50,9 @@ test("mélange les choix de chaque question, en gardant la bonne réponse", asyn
   const { gameId } = CreatedGame.parse((await createGame()).json());
   const { questions } = GameState.parse(JSON.parse((await redis.get(`game:${gameId}:state`)) ?? "null"));
   const [question] = questions;
-  expect(question?.choices.toSorted()).toEqual(["Faux", "Vrai"]);
-  expect(question?.choices[question.correctIndex]).toBe("Vrai");
+  if (question?.kind !== "choice") throw new Error("QCM attendu");
+  expect(question.choices.toSorted()).toEqual(["Faux", "Vrai"]);
+  expect(question.choices[question.correctIndex]).toBe("Vrai");
 });
 
 test("refuse de lancer le quiz d'un autre animateur", async () => {

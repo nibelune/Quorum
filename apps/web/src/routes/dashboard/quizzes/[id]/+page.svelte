@@ -12,8 +12,10 @@
   const DURATIONS = [5, 10, 20, 30, 45, 60, 90, 120, 180, 240, 300];
   const quizId = page.params.id ?? "new";
 
-  const multipleChoice = (): DraftQuestion => ({ text: "", choices: ["", "", "", ""], correctIndex: 0, durationSec: 20 });
-  const trueFalse = (): DraftQuestion => ({ text: "", choices: ["Vrai", "Faux"], correctIndex: 0, durationSec: 20 });
+  const multipleChoice = (): DraftQuestion => ({ kind: "choice", text: "", choices: ["", "", "", ""], correctIndex: 0, durationSec: 20 });
+  const trueFalse = (): DraftQuestion => ({ kind: "choice", text: "", choices: ["Vrai", "Faux"], correctIndex: 0, durationSec: 20 });
+  // Un sondage n'a pas de bonne réponse et ne rapporte aucun point.
+  const poll = (): DraftQuestion => ({ kind: "poll", text: "", choices: ["", "", "", ""], durationSec: 20 });
 
   let draft: QuizInput | null = $state(null);
   let error = $state("");
@@ -35,6 +37,7 @@
 
   function removeChoice(question: DraftQuestion, index: number) {
     question.choices.splice(index, 1);
+    if (question.kind !== "choice") return;
     if (index < question.correctIndex) question.correctIndex--;
     else if (index === question.correctIndex) question.correctIndex = 0;
   }
@@ -84,7 +87,7 @@
 
     {#each draft.questions as question, q (question)}
       <fieldset>
-        <legend>Question {q + 1}</legend>
+        <legend>Question {q + 1}{question.kind === "poll" ? " (sondage)" : ""}</legend>
         <label>Énoncé <textarea bind:value={question.text} required maxlength="300" rows="2"></textarea></label>
 
         <div class="image">
@@ -115,10 +118,12 @@
             <li>
               <ChoiceShape index={c} />
               <input bind:value={question.choices[c]} aria-label="Choix {c + 1}" required maxlength="120" />
-              <label class="correct">
-                <input type="radio" name="correct-{q}" value={c} bind:group={question.correctIndex} />
-                Bonne réponse
-              </label>
+              {#if question.kind === "choice"}
+                <label class="correct">
+                  <input type="radio" name="correct-{q}" value={c} bind:group={question.correctIndex} />
+                  Bonne réponse
+                </label>
+              {/if}
               {#if question.choices.length > 2}
                 <button type="button" onclick={() => {
                     removeChoice(question, c);
@@ -156,6 +161,9 @@
       <button type="button" onclick={() => {
           addQuestion(trueFalse());
         }}>Ajouter un vrai/faux</button>
+      <button type="button" onclick={() => {
+          addQuestion(poll());
+        }}>Ajouter un sondage</button>
     </div>
 
     {#if error}<p class="error" role="alert">{error}</p>{/if}

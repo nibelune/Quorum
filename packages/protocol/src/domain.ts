@@ -36,16 +36,20 @@ export const ImageKey = z.string().regex(/^[0-9a-f-]{36}\.(jpeg|png|webp)$/);
 // Seules les URL délivrées par l'API sont acceptées dans une question, jamais celles d'un site tiers.
 export const ImageUrl = z.templateLiteral(["/api/images/", ImageKey]);
 
-// Une question vrai/faux est un QCM à deux choix.
-export const QuestionContent = z
-  .object({
-    text: z.string().trim().min(1).max(300),
-    choices: z.array(z.string().trim().min(1).max(120)).min(2).max(MAX_CHOICES),
-    correctIndex: ChoiceIndex,
-    durationSec: z.int().min(5).max(300),
-    imageUrl: ImageUrl.optional(),
-  })
-  .refine((question) => question.correctIndex < question.choices.length);
+export const QuestionText = z.string().trim().min(1).max(300);
+export const Choices = z.array(z.string().trim().min(1).max(120)).min(2).max(MAX_CHOICES);
+const common = { text: QuestionText, durationSec: z.int().min(5).max(300), imageUrl: ImageUrl.optional() };
 
-export const Question = QuestionContent.safeExtend({ id: QuestionId });
+// Les types de question (ADR 0015). Une question vrai/faux est un QCM à deux choix ; un sondage n'a pas de bonne réponse
+// et ne rapporte aucun point.
+export const MultipleChoiceQuestion = z
+  .object({ kind: z.literal("choice"), ...common, choices: Choices, correctIndex: ChoiceIndex })
+  .refine((question) => question.correctIndex < question.choices.length);
+export const PollQuestion = z.object({ kind: z.literal("poll"), ...common, choices: Choices });
+
+export const QuestionKind = z.enum(["choice", "poll"]);
+export type QuestionKind = z.infer<typeof QuestionKind>;
+
+const withId = { id: QuestionId };
+export const Question = z.discriminatedUnion("kind", [MultipleChoiceQuestion.safeExtend(withId), PollQuestion.safeExtend(withId)]);
 export type Question = z.infer<typeof Question>;

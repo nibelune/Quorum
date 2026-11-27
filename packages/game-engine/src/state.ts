@@ -87,7 +87,8 @@ export const GameEvent = z.discriminatedUnion("type", [
     type: z.literal("question_ended"),
     seq: Seq,
     questionId: QuestionId,
-    correctIndex: ChoiceIndex,
+    // Absente pour un sondage.
+    correctIndex: ChoiceIndex.optional(),
     distribution: z.array(Count),
     results: z.record(
       TeamId,

@@ -8,6 +8,7 @@ const reds = { teamId: TeamId.parse(crypto.randomUUID()), name: "Rouges" };
 const questionId = QuestionId.parse(crypto.randomUUID());
 const question: ShownQuestion = {
   questionId,
+  kind: "choice",
   text: "La Terre est ronde.",
   choices: ["Vrai", "Faux"],
   imageUrl: `/api/images/${crypto.randomUUID()}.png`,

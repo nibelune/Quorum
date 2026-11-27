@@ -30,7 +30,7 @@ Ce document décrit le *comment*. Le *pourquoi* des choix est dans `docs/adr/`.
 
 Phases : `lobby` -> `question` -> `reveal` -> `leaderboard` -> (question suivante ou) `ended`
 
-- Une question a un énoncé (300 caractères max), 2 à 4 choix (120 caractères max), une seule bonne réponse, une durée de 5 à 300 s et, au besoin, une image (JPEG, PNG ou WebP, 2 Mo max, ADR 0013). Une question vrai/faux est un QCM à deux choix.
+- Une question a un type (ADR 0015), un énoncé (300 caractères max), une durée de 5 à 300 s et, au besoin, une image (JPEG, PNG ou WebP, 2 Mo max, ADR 0013). Un QCM (`choice`) a 2 à 4 choix (120 caractères max) et une seule bonne réponse ; une question vrai/faux est un QCM à deux choix. Un sondage (`poll`) a des choix sans bonne réponse et ne rapporte aucun point.
 - Les choix de chaque question sont mélangés une fois, à la création de la partie : l'ordre de l'auteur ne se retrouve pas à l'écran. Chaque téléphone les présente en plus dans son propre ordre, tiré de la question et du pseudo, pour qu'un joueur le retrouve après une reconnexion : dans une salle, « la troisième réponse » ou « le triangle bleu » ne désigne pas la même réponse pour tous. Sur chaque écran, formes et couleurs suivent la position, et le joueur répond d'après le texte.
 - Pendant une question, l'écran projeté consacre ses deux tiers du haut à l'énoncé, posé sur l'image, et son tiers du bas aux réponses, en 2 × 2. Les téléphones reprennent une grille 2 × 2, sans l'image.
 - L'animateur crée une partie depuis le dashboard et choisit le mode : `solo` ou `teams`. Un PIN à 6 chiffres et un QR code s'affichent sur l'écran projeté.
@@ -85,7 +85,7 @@ Messages JSON validés par zod, union discriminée sur `type`. Taille maximale :
 - Animateur : `start`, `next`, `kick { playerId }`, `end`
 
 **Serveur -> client**
-- Issus du flux d'événements, avec `seq` : `player_joined { playerId, nickname, team }` (animateur), `team_created { team }` (visiteurs, en mode équipes), `player_left`, `captain_changed { captain }` et `team_answer_locked { choiceIndex }` (équipe concernée uniquement), `question_started { questionId, text, choices, imageUrl?, deadline }`, `answer_count` (animateur), `question_ended { correctIndex, distribution, you? }`, `leaderboard { top, you? }`, `game_ended { podium }`. `you`, `top` et `podium` portent sur les équipes (en solo, celles d'un membre) : une ligne de classement est `{ name, score }`.
+- Issus du flux d'événements, avec `seq` : `player_joined { playerId, nickname, team }` (animateur), `team_created { team }` (visiteurs, en mode équipes), `player_left`, `captain_changed { captain }` et `team_answer_locked { choiceIndex }` (équipe concernée uniquement), `question_started { questionId, kind, text, choices, imageUrl?, deadline }`, `answer_count` (animateur), `question_ended { questionId, correctIndex?, distribution, you? }` (sans `correctIndex` pour un sondage), `leaderboard { top, you? }`, `game_ended { podium }`. `you`, `top` et `podium` portent sur les équipes (en solo, celles d'un membre) : une ligne de classement est `{ name, score }`.
 - Locaux au nœud, sans `seq` : `welcome { token }` (réponse à `join`), `snapshot { seq, view }` (aussi la réponse à `lookup`, avec la vue `visitor`), `answer_received`, `pong { t, serverTime }`, `error { code }`, `reload`
 
 Si `protocolVersion` ne correspond pas, le serveur répond `reload` : le client recharge la page. Ça évite les incohérences après un déploiement.
