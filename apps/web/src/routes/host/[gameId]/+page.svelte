@@ -178,6 +178,7 @@
       <section class="ranking">
         <h1>Podium</h1>
         <Standings standings={stage.podium} />
+        <a href={resolve("/dashboard/games/[id]", { id: gameId })}>Voir les statistiques</a>
         <a href={resolve("/dashboard")}>Retour à mes quiz</a>
       </section>
     {/if}

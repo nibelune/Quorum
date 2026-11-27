@@ -51,4 +51,14 @@ test("un animateur et trois joueurs jouent une partie complète", async ({ brows
     await alice.getByRole("button", { name: "Rejoindre une autre partie" }).click();
     await expect(alice.getByRole("heading", { name: "Rejoindre une partie" })).toBeVisible();
   });
+
+  await test.step("l'animateur consulte les statistiques de la partie", async () => {
+    await host.getByRole("link", { name: "Voir les statistiques" }).click();
+    await expect(host.getByRole("heading", { name: "Géographie" })).toBeVisible();
+    await expect(host.getByRole("row")).toHaveText([/Rang/, /Alice/, /Bob/, /Chloé/]);
+    await expect(host.getByText("Bonnes réponses : 2 / 3")).toBeVisible();
+    await expect(host.getByText("Bonnes réponses : 1 / 3")).toBeVisible();
+    await host.getByRole("link", { name: "Toutes mes parties" }).click();
+    await expect(host.getByRole("link", { name: /Géographie/ })).toBeVisible();
+  });
 });

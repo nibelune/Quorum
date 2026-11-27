@@ -20,7 +20,7 @@ Ce document décrit le *comment*. Le *pourquoi* des choix est dans `docs/adr/`.
 
 - En production (Railway, ADR 0012), le point d'entrée public de Railway termine le HTTPS devant Caddy.
 - **web** (SvelteKit) est rendu côté client (ADR 0011) : le navigateur appelle directement l'API et le WebSocket, à travers Caddy.
-- **api** gère les comptes, les quiz et la création des parties. Il enregistre la partie dans Postgres, écrit son état initial dans Redis et délivre les jetons animateur.
+- **api** gère les comptes, les quiz et la création des parties. Il enregistre la partie dans Postgres, écrit son état initial dans Redis et délivre les jetons animateur. Il sert aussi les résultats des parties terminées : classement et statistiques par question, calculés en SQL.
 - **realtime** gère tout le reste du cycle de vie d'une partie. Il ne parle qu'à Redis, jamais à Postgres.
 - **worker** exécute les tâches BullMQ : à la fin d'une partie, il copie ses résultats de Redis vers Postgres (ADR 0014) ; chaque nuit, il supprime les images qu'aucun quiz ni aucune partie n'utilise (ADR 0013).
 - **Postgres** contient les comptes et les quiz. Les questions d'un quiz sont stockées dans une colonne `jsonb` de la table `quizzes` (ADR 0009).

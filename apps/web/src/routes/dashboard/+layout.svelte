@@ -16,7 +16,11 @@
 </script>
 
 <header>
-  <a href={resolve("/dashboard")}>Quorum</a>
+  <a class="logo" href={resolve("/dashboard")}>Quorum</a>
+  <nav>
+    <a href={resolve("/dashboard")}>Mes quiz</a>
+    <a href={resolve("/dashboard/games")}>Mes parties</a>
+  </nav>
   <button onclick={signOut}>Se déconnecter</button>
 </header>
 <main>
@@ -27,16 +31,29 @@
   header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 1.5rem;
     padding: 1rem clamp(1rem, 4vw, 3rem);
     background: var(--brand);
   }
 
   header a {
-    font-size: 1.4rem;
-    font-weight: 800;
+    font-weight: 600;
     color: var(--brand-ink);
     text-decoration: none;
+  }
+
+  header .logo {
+    font-size: 1.4rem;
+    font-weight: 800;
+  }
+
+  nav {
+    display: flex;
+    gap: 1rem;
+  }
+
+  header button {
+    margin-left: auto;
   }
 
   main {

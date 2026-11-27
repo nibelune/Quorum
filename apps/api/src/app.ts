@@ -8,6 +8,7 @@ import type { Auth } from "./auth.ts";
 import { gameRoutes } from "./games.ts";
 import { imageRoutes, imageUploadRoutes } from "./images.ts";
 import { quizRoutes } from "./quizzes.ts";
+import { resultRoutes } from "./results.ts";
 
 export interface Deps {
   db: Db;
@@ -60,6 +61,7 @@ export function buildApp(deps: Deps, logger: FastifyServerOptions["logger"] = fa
     quizRoutes(animator, deps);
     gameRoutes(animator, deps);
     imageUploadRoutes(animator, deps);
+    resultRoutes(animator, deps);
     done();
   });
 

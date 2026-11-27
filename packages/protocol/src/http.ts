@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GameId, GameMode, ImageUrl, Pin, Question, QuestionContent, QuestionId, QuizId } from "./domain.ts";
+import { GameId, GameMode, ImageUrl, Nickname, Pin, Question, QuestionContent, QuestionId, QuizId, TeamName } from "./domain.ts";
 
 const Title = z.string().trim().min(1).max(120);
 
@@ -28,3 +28,32 @@ export const CreatedGame = z.object({ gameId: GameId, pin: Pin });
 export const HostToken = z.object({ token: z.string() });
 
 export const UploadedImage = z.object({ url: ImageUrl });
+
+const Count = z.int().nonnegative();
+// Temps de réponse moyen, en millisecondes ; null si personne n'a répondu.
+const AverageMs = Count.nullable();
+
+// Une partie terminée, dans la liste de l'animateur.
+export const GameSummary = z.object({ id: GameId, title: Title, mode: GameMode, endedAt: z.iso.datetime(), playerCount: Count });
+export type GameSummary = z.infer<typeof GameSummary>;
+
+export const GameResults = z.object({
+  id: GameId,
+  title: Title,
+  mode: GameMode,
+  endedAt: z.iso.datetime(),
+  // Les questions telles qu'elles ont été jouées : `distribution` compte les réponses de chaque choix, dans leur ordre.
+  questions: z.array(Question.safeExtend({ distribution: z.array(Count), averageResponseMs: AverageMs })),
+  // De la première à la dernière. En solo, chaque joueur forme une équipe d'un membre, à son nom.
+  teams: z.array(
+    z.object({
+      name: TeamName,
+      members: z.array(Nickname),
+      score: Count,
+      rank: z.int().positive(),
+      correctCount: Count,
+      averageResponseMs: AverageMs,
+    }),
+  ),
+});
+export type GameResults = z.infer<typeof GameResults>;

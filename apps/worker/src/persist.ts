@@ -47,6 +47,6 @@ export async function persistGame({ db, redis, logger }: Deps, gameId: GameId, e
       await tx.insert(gamePlayers).values(state.players.map(({ playerId, nickname, teamId }) => ({ gameId, playerId, nickname, teamId })));
     }
     if (answers.length > 0) await tx.insert(gameAnswers).values(answers);
+    logger.info({ gameId, teams: state.teams.length, answers: answers.length }, "résultats enregistrés");
   });
-  logger.info({ gameId, teams: state.teams.length, answers: answers.length }, "résultats enregistrés");
 }

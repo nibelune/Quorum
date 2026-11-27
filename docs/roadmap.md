@@ -37,7 +37,6 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 ## Phase 4 : SaaS et vitrine
 
 - [ ] Organisations et rôles
-- [ ] Stripe : plans selon le nombre de joueurs par partie
 - [ ] OpenTelemetry
 - [ ] Vue ops en direct : nœuds, connexions par nœud, messages par seconde, parties coordonnées par chaque nœud
 - [ ] Test de charge k6 (`make load`) : résultats p50/p95/p99 et nombre de connexions simultanées dans le README
