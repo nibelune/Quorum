@@ -31,7 +31,7 @@ L'architecture cible est en place dès le départ (Redis, streams, `commit`), av
 - [x] Choix mélangés, réponses en 2 × 2 sur le tiers bas de l'écran, image par question (ADR 0013)
 - [x] `worker` (BullMQ) : persistance des résultats en fin de partie (ADR 0014)
 - [ ] Statistiques après la partie (par question, par joueur)
-- [ ] Bibliothèque de quiz : duplication, import
+- [x] Bibliothèque de quiz : duplication, export et import (JSON)
 - [ ] Nouveaux types de questions : sondage, nuage de mots, remise dans l'ordre
 
 ## Phase 4 : SaaS et vitrine

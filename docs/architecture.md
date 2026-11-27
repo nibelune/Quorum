@@ -23,7 +23,7 @@ Ce document décrit le *comment*. Le *pourquoi* des choix est dans `docs/adr/`.
 - **api** gère les comptes, les quiz et la création des parties. Il enregistre la partie dans Postgres, écrit son état initial dans Redis et délivre les jetons animateur. Il sert aussi les résultats des parties terminées : classement et statistiques par question, calculés en SQL.
 - **realtime** gère tout le reste du cycle de vie d'une partie. Il ne parle qu'à Redis, jamais à Postgres.
 - **worker** exécute les tâches BullMQ : à la fin d'une partie, il copie ses résultats de Redis vers Postgres (ADR 0014) ; chaque nuit, il supprime les images qu'aucun quiz ni aucune partie n'utilise (ADR 0013).
-- **Postgres** contient les comptes et les quiz. Les questions d'un quiz sont stockées dans une colonne `jsonb` de la table `quizzes` (ADR 0009).
+- **Postgres** contient les comptes et les quiz. Les questions d'un quiz sont stockées dans une colonne `jsonb` de la table `quizzes` (ADR 0009). Le tableau de bord duplique, exporte et importe les quiz sans route dédiée : le fichier exporté est le corps de `POST /api/quizzes`, sans les identifiants des questions, que le serveur attribue à nouveau.
 - **Bucket S3** : les images des questions, que l'API est seule à lire et écrire (ADR 0013). En dev, `adobe/s3mock` le remplace.
 
 ## Déroulé d'une partie
