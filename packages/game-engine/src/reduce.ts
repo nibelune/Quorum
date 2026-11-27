@@ -177,8 +177,10 @@ function startQuestion(state: GameState, index: number, at: number): ReduceResul
 function endQuestion(state: GameState, round: QuestionRound): ReduceResult {
   const question = questionAt(state, round.index);
   const scored = state.teams.map((team) => {
-    const points = pointsFor(question, round.startedAt, round.answers.find((answer) => answer.teamId === team.teamId));
-    return { team: { ...team, score: team.score + points }, points };
+    const answer = round.answers.find(({ teamId }) => teamId === team.teamId);
+    const points = pointsFor(question, round.startedAt, answer);
+    const given = answer && { choiceIndex: answer.choiceIndex, responseMs: Math.max(answer.at - round.startedAt, 0) };
+    return { team: { ...team, score: team.score + points }, points, given };
   });
   return emit(
     {
@@ -188,9 +190,10 @@ function endQuestion(state: GameState, round: QuestionRound): ReduceResult {
     },
     {
       type: "question_ended",
+      questionId: question.id,
       correctIndex: question.correctIndex,
       distribution: distribution(question, round.answers),
-      results: Object.fromEntries(scored.map(({ team, points }) => [team.teamId, { points, score: team.score }])),
+      results: Object.fromEntries(scored.map(({ team, points, given }) => [team.teamId, { points, score: team.score, ...given }])),
     },
   );
 }

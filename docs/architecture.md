@@ -14,14 +14,15 @@ Ce document décrit le *comment*. Le *pourquoi* des choix est dans `docs/adr/`.
        web             api            realtime × N
     (SvelteKit)     (Fastify)       (ws, sans état local durable)
                         │                  │
-                     Postgres            Redis
-              (comptes, quiz, résultats)  (parties en cours)
+                     Postgres ◄── worker ── Redis
+              (comptes, quiz, résultats)  (parties en cours, file BullMQ)
 ```
 
 - En production (Railway, ADR 0012), le point d'entrée public de Railway termine le HTTPS devant Caddy.
 - **web** (SvelteKit) est rendu côté client (ADR 0011) : le navigateur appelle directement l'API et le WebSocket, à travers Caddy.
-- **api** gère les comptes, les quiz et la création des parties. Il écrit l'état initial d'une partie dans Redis et délivre les jetons animateur.
+- **api** gère les comptes, les quiz et la création des parties. Il enregistre la partie dans Postgres, écrit son état initial dans Redis et délivre les jetons animateur.
 - **realtime** gère tout le reste du cycle de vie d'une partie. Il ne parle qu'à Redis, jamais à Postgres.
+- **worker** exécute les tâches BullMQ : à la fin d'une partie, il copie ses résultats de Redis vers Postgres (ADR 0014) ; chaque nuit, il supprime les images qu'aucun quiz ni aucune partie n'utilise (ADR 0013).
 - **Postgres** contient les comptes et les quiz. Les questions d'un quiz sont stockées dans une colonne `jsonb` de la table `quizzes` (ADR 0009).
 - **Bucket S3** : les images des questions, que l'API est seule à lire et écrire (ADR 0013). En dev, `adobe/s3mock` le remplace.
 
@@ -107,7 +108,7 @@ Chaque partie a un **coordinateur** : le seul nœud qui applique les commandes e
 
 1. Un client envoie un message à n'importe quel nœud. Le nœud le valide (zod, jeton, rate limit), l'horodate (`at = Date.now()`) et l'ajoute au stream `game:{id}:commands`, avec l'adresse de la connexion qui l'a reçu (`nodeId`, `connId`). Les messages d'une connexion sont traités un par un, dans l'ordre d'arrivée.
 2. Pour une réponse, le nœud renvoie aussitôt `answer_received`. Ça confirme la réception, pas la validité. Sans cet accusé (la réponse a pu se perdre avec un nœud qui tombe), le client la renvoie après s'être reconnecté ; un doublon est refusé (`already_answered`), ce que le client traite comme une réponse enregistrée.
-3. Le coordinateur lit les commandes par lots, appelle `reduce` pour chacune, puis exécute le script Lua générique `commit` (aucune logique métier) : il vérifie que le lease porte toujours son token, écrit le nouvel état, ajoute les événements au stream `game:{id}:events` et supprime les commandes appliquées (`XTRIM MINID`), le tout de façon atomique. Le stream de commandes ne contient donc que des commandes en attente (ADR 0010).
+3. Le coordinateur lit les commandes par lots, appelle `reduce` pour chacune, puis exécute le script Lua générique `commit` (aucune logique métier) : il vérifie que le lease porte toujours son token, écrit le nouvel état, ajoute les événements au stream `game:{id}:events`, archive les fins de question dans `game:{id}:rounds` et supprime les commandes appliquées (`XTRIM MINID`), le tout de façon atomique. Le stream de commandes ne contient donc que des commandes en attente (ADR 0010).
 4. Chaque nœud lit les streams d'événements des parties dont il sert au moins un client. Pour chaque socket locale, il applique `project` et envoie le résultat.
 5. Un refus de `reduce` (`nickname_taken`, `too_late`...) et un `join` accepté appellent une réponse individuelle. Après le `commit`, le coordinateur la publie sur `node:{nodeId}:replies`, le canal Pub/Sub du nœud qui a reçu la commande (ADR 0010). Ce nœud envoie `error` à la socket, ou `welcome` puis `snapshot` pour un `join`.
 
@@ -150,6 +151,12 @@ Sur `SIGTERM`, le nœud :
 
 Les clients se reconnectent sur un autre nœud et reprennent via `lastSeq`.
 
+### Fin de partie et résultats (ADR 0014)
+
+- Chaque `question_ended` porte, pour chaque équipe, son choix, son temps de réponse et ses points. Le `commit` le recopie dans `game:{id}:rounds`, que le plafond du stream des événements n'atteint pas.
+- Au `game_ended`, le coordinateur ajoute la tâche `persist-game` à la file BullMQ `jobs`, avec l'identifiant de la partie comme identifiant de tâche. Un nœud qui reprend une partie terminée l'ajoute à nouveau ; BullMQ ignore le doublon.
+- Le worker lit l'état final et les fins de question, puis écrit en une transaction : la date de fin dans `games`, et les tables `game_teams`, `game_players` et `game_answers`. La tâche peut être rejouée sans dupliquer les résultats.
+
 ## Clés Redis
 
 ```
@@ -160,6 +167,8 @@ game:{id}:commands      stream des commandes entrantes
 game:{id}:events        stream des événements, ID = {seq}-0, MAXLEN ~1000
 game:{id}:lease         {nodeId}:{token}, PX 5000
 game:{id}:fence         compteur de fencing tokens
+game:{id}:rounds        fins de question archivées pour le worker (ADR 0014)
+bull:jobs:*             file BullMQ des tâches du worker
 node:{nodeId}:replies   canal Pub/Sub des réponses individuelles (refus, join accepté)
 ratelimit:lookup:{ip}   compteur de PIN inconnus, TTL 60 s
 ```

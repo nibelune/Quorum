@@ -90,7 +90,7 @@ export const ServerMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("question_started"), seq: Seq, ...ShownQuestion.shape }),
   z.object({ type: z.literal("team_answer_locked"), seq: Seq, choiceIndex: ChoiceIndex }),
   z.object({ type: z.literal("answer_count"), seq: Seq, count: Count }),
-  z.object({ type: z.literal("question_ended"), seq: Seq, ...Reveal }),
+  z.object({ type: z.literal("question_ended"), seq: Seq, questionId: QuestionId, ...Reveal }),
   z.object({ type: z.literal("leaderboard"), seq: Seq, ...Leaderboard }),
   z.object({ type: z.literal("game_ended"), seq: Seq, podium: z.array(Standing) }),
   z.object({ type: z.literal("welcome"), token: z.string() }),

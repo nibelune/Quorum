@@ -82,12 +82,17 @@ export const GameEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("team_answer_locked"), seq: Seq, teamId: TeamId, choiceIndex: ChoiceIndex }),
   z.object({ type: z.literal("question_started"), seq: Seq, ...ShownQuestion.shape }),
   z.object({ type: z.literal("answer_count"), seq: Seq, count: Count }),
+  // Le choix et le temps de réponse de chaque équipe servent aux statistiques : chaque fin de question est archivée (ADR 0014).
   z.object({
     type: z.literal("question_ended"),
     seq: Seq,
+    questionId: QuestionId,
     correctIndex: ChoiceIndex,
     distribution: z.array(Count),
-    results: z.record(TeamId, z.object({ points: Score, score: Score })),
+    results: z.record(
+      TeamId,
+      z.object({ points: Score, score: Score, choiceIndex: ChoiceIndex.optional(), responseMs: Count.optional() }),
+    ),
   }),
   z.object({
     type: z.literal("leaderboard"),

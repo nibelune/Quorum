@@ -135,15 +135,25 @@ describe("tick", () => {
 });
 
 describe("fin d'une question", () => {
-  test("donne la bonne réponse, la répartition et le résultat de chaque joueur", () => {
+  test("donne la bonne réponse, la répartition et, pour chaque équipe, son choix, son temps et ses points", () => {
     const { events } = play(...question, answer(alice, 1, T0 + 10_000), answer(bob, 0));
     expect(events.at(-1)).toEqual({
       type: "question_ended",
       seq: 4,
+      questionId: capital.id,
       correctIndex: 1,
       distribution: [1, 1, 0],
-      results: { [soloTeam(alice)]: { points: 750, score: 750 }, [soloTeam(bob)]: { points: 0, score: 0 } },
+      results: {
+        [soloTeam(alice)]: { points: 750, score: 750, choiceIndex: 1, responseMs: 10_000 },
+        [soloTeam(bob)]: { points: 0, score: 0, choiceIndex: 0, responseMs: 0 },
+      },
     });
+  });
+
+  test("une équipe qui n'a pas répondu n'a ni choix ni temps", () => {
+    const { events } = play(...question, answer(alice, 1), host("next"));
+    expect(events.at(-1)).toMatchObject({ results: { [soloTeam(bob)]: { points: 0, score: 0 } } });
+    expect(events.at(-1)).not.toHaveProperty(["results", soloTeam(bob), "choiceIndex"]);
   });
 
   test("cumule les scores d'une question à l'autre", () => {

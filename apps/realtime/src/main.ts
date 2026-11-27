@@ -1,4 +1,6 @@
 import { hostname } from "node:os";
+import { JOBS_QUEUE, type PersistGame } from "@quorum/protocol";
+import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import { pino } from "pino";
 import { z } from "zod";
@@ -11,6 +13,7 @@ const env = z
 const nodeId = hostname();
 const logger = pino({ base: { nodeId } });
 const redis = new Redis(env.REDIS_URL);
+const jobs = new Queue<PersistGame>(JOBS_QUEUE, { connection: redis });
 const node = startNode({
   redis,
   nodeId,
@@ -19,13 +22,17 @@ const node = startNode({
   now: () => Date.now(),
   logger,
   leaseMs: 5000,
+  jobs,
 });
 
 node.server.listen(3000, () => {
   logger.info("realtime à l'écoute sur le port 3000");
 });
 process.once("SIGTERM", () => {
-  void node.shutdown().then(() => {
-    redis.disconnect();
-  });
+  void node
+    .shutdown()
+    .then(() => jobs.close())
+    .then(() => {
+      redis.disconnect();
+    });
 });

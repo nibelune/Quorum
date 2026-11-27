@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { createGame } from "@quorum/game-engine";
-import { GameId, type GameMode, PROTOCOL_VERSION, Question, ServerMessage, type TeamChoice } from "@quorum/protocol";
+import { GameId, type GameMode, JOBS_QUEUE, type PersistGame, PROTOCOL_VERSION, Question, ServerMessage, type TeamChoice } from "@quorum/protocol";
+import { Queue } from "bullmq";
 import { signToken } from "@quorum/protocol/token";
 import { Redis } from "ioredis";
 import { pino } from "pino";
@@ -22,6 +23,7 @@ export const question = Question.parse({
 
 export async function startTestNode({ leaseMs = 600 } = {}) {
   const redis = new Redis(TEST_REDIS_URL);
+  const jobs = new Queue<PersistGame>(JOBS_QUEUE, { connection: redis });
   const nodeId = `test-${crypto.randomUUID()}`;
   let offset = 0;
   const node = startNode({
@@ -32,6 +34,7 @@ export async function startTestNode({ leaseMs = 600 } = {}) {
     now: () => Date.now() + offset,
     logger: pino({ level: "silent" }),
     leaseMs,
+    jobs,
   });
   await new Promise<void>((resolve) => node.server.listen(0, resolve));
   const address = node.server.address();
@@ -40,12 +43,14 @@ export async function startTestNode({ leaseMs = 600 } = {}) {
     nodeId,
     url: `ws://localhost:${String(address.port)}/ws`,
     redis,
+    jobs,
     advanceClock(ms: number) {
       offset += ms;
     },
     shutdown: () => node.shutdown(),
     async close() {
       await node.close();
+      await jobs.close();
       redis.disconnect();
     },
   };

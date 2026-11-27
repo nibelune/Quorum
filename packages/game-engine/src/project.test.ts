@@ -68,15 +68,16 @@ describe("project", () => {
     expect(project(event, toVisitor)).toBeNull();
   });
 
-  test("question_ended ne donne à chaque joueur que le résultat de son équipe", () => {
+  test("question_ended ne donne à chaque joueur que les points et le score de son équipe", () => {
     const event: GameEvent = {
       type: "question_ended",
       seq: 4,
+      questionId: capital.id,
       correctIndex: 1,
       distribution: [1, 1, 0],
-      results: { [red]: { points: 1000, score: 1000 }, [blue]: { points: 0, score: 0 } },
+      results: { [red]: { points: 1000, score: 1000, choiceIndex: 1, responseMs: 0 }, [blue]: { points: 0, score: 0 } },
     };
-    const shared = { type: "question_ended", seq: 4, correctIndex: 1, distribution: [1, 1, 0] };
+    const shared = { type: "question_ended", seq: 4, questionId: capital.id, correctIndex: 1, distribution: [1, 1, 0] };
     expect(project(event, toHost)).toStrictEqual(shared);
     expect(project(event, toPlayer(bob, red))).toStrictEqual({ ...shared, you: { points: 1000, score: 1000 } });
     expect(project(event, toPlayer(carol))).toEqual(shared);

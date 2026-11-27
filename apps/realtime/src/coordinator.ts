@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { type GameEvent, type GameState, reduce } from "@quorum/game-engine";
+import { PERSIST_GAME } from "@quorum/protocol";
 import {
   addCommand,
   CommandEntry,
@@ -84,6 +85,8 @@ async function maintainLeases(node: Node): Promise<void> {
     game.coordination = { lease: `${nodeId}:${String(token)}`, state, tick: undefined };
     scheduleTicks(node, game, game.coordination);
     game.log.info({ lease: game.coordination.lease }, "lease acquis");
+    // Le coordinateur précédent a pu tomber entre le commit de la fin de partie et l'ajout de la tâche.
+    if (state.current.phase === "ended") await persistResults(node, game);
   }
 }
 
@@ -125,6 +128,7 @@ async function coordinate(
   }
 
   if (state.current.phase !== coordination.state.current.phase) game.log.info({ phase: state.current.phase }, "transition");
+  if (events.some(({ type }) => type === "game_ended")) await persistResults(node, game);
   coordination.state = state;
   if (game.coordination === coordination) scheduleTicks(node, game, coordination);
   // Un seul aller-retour vers Redis pour toutes les réponses du lot. `exec` ne rejette pas : chaque commande rend son erreur.
@@ -136,9 +140,11 @@ async function coordinate(
 async function commit(node: Node, game: LocalGame, lease: string, state: GameState, events: GameEvent[], lastId: string): Promise<void> {
   const gameKeys = keys(game.id);
   const [time = "0", sequence = "0"] = lastId.split("-");
+  // Le stream des événements est plafonné : les fins de question sont aussi archivées, pour les résultats de la partie.
+  const archived = events.filter(({ type }) => type === "question_ended").map((event) => JSON.stringify(event));
   await node.deps.redis.eval(
     COMMIT_SCRIPT,
-    7,
+    8,
     gameKeys.lease,
     gameKeys.state,
     gameKeys.events,
@@ -146,12 +152,31 @@ async function commit(node: Node, game: LocalGame, lease: string, state: GameSta
     `pin:${state.pin}`,
     gameKeys.owner,
     gameKeys.fence,
+    gameKeys.rounds,
     lease,
     JSON.stringify(state),
     `${time}-${String(Number(sequence) + 1)}`,
     GAME_TTL_SECONDS,
+    archived.length,
+    ...archived,
     ...events.flatMap((event) => [`${String(event.seq)}-0`, JSON.stringify(event)]),
   );
+}
+
+// Le worker copie les résultats dans Postgres. La tâche porte l'identifiant de la partie : BullMQ ignore un doublon.
+async function persistResults(node: Node, game: LocalGame): Promise<void> {
+  await node.deps.jobs.add(
+    PERSIST_GAME,
+    { gameId: game.id },
+    {
+      jobId: game.id,
+      attempts: 5,
+      backoff: { type: "exponential", delay: 1000 },
+      removeOnComplete: { age: 24 * 60 * 60 },
+      removeOnFail: { age: 7 * 24 * 60 * 60 },
+    },
+  );
+  game.log.info("résultats à enregistrer");
 }
 
 // Le chrono ne tourne que chez le coordinateur, et seulement pendant une question.

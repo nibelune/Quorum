@@ -16,6 +16,13 @@ const PUBLIC_ORIGIN = "https://${{caddy.RAILWAY_PUBLIC_DOMAIN}}";
 const REDIS_URL = "redis://${{redis.RAILWAY_PRIVATE_DOMAIN}}:6379";
 // Railway injecte PORT et y adresse ses healthchecks : on le fixe au port d'écoute des apps.
 const PORT = "3000";
+// Le bucket des images, que l'API et le worker adressent par chemin, comme le serveur S3 local du Compose.
+const S3 = {
+  S3_BUCKET_URL: "${{images.ENDPOINT}}/${{images.BUCKET}}",
+  S3_REGION: "${{images.REGION}}",
+  S3_ACCESS_KEY_ID: "${{images.ACCESS_KEY_ID}}",
+  S3_SECRET_ACCESS_KEY: "${{images.SECRET_ACCESS_KEY}}",
+};
 // Région et taille fixées par Railway à la création : les reprendre ici évite qu'un plan tente de les réduire.
 const VOLUME = { region: "europe-west4-drams3a", sizeMB: 5000 };
 
@@ -53,11 +60,7 @@ export default defineRailway(() => {
       PUBLIC_ORIGIN,
       SESSION_SECRET: preserve(),
       BETTER_AUTH_SECRET: preserve(),
-      // Adressage par chemin, comme avec le serveur S3 local du Compose.
-      S3_BUCKET_URL: "${{images.ENDPOINT}}/${{images.BUCKET}}",
-      S3_REGION: "${{images.REGION}}",
-      S3_ACCESS_KEY_ID: "${{images.ACCESS_KEY_ID}}",
-      S3_SECRET_ACCESS_KEY: "${{images.SECRET_ACCESS_KEY}}",
+      ...S3,
     },
   });
 
@@ -68,6 +71,12 @@ export default defineRailway(() => {
     healthcheck: "/health",
     deploy: { drainingSeconds: 10 },
     env: { PORT, REDIS_URL, PUBLIC_ORIGIN, SESSION_SECRET: api.env.SESSION_SECRET },
+  });
+
+  // Sans port ni domaine : il exécute les tâches de la file BullMQ (ADR 0014) et nettoie le bucket des images.
+  const worker = service("worker", {
+    ...fromRepo("apps/worker/Dockerfile", ["apps/worker/**", "packages/**", "pnpm-lock.yaml"]),
+    env: { DATABASE_URL: api.env.DATABASE_URL, REDIS_URL, ...S3 },
   });
 
   const web = service("web", {
@@ -90,6 +99,6 @@ export default defineRailway(() => {
   });
 
   return project("quorum", {
-    resources: [postgresData, postgres, redisData, redis, images, api, realtime, web, caddy],
+    resources: [postgresData, postgres, redisData, redis, images, api, realtime, worker, web, caddy],
   });
 });

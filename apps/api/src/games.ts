@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { quizzes } from "@quorum/db";
+import { games, quizzes } from "@quorum/db";
 import { createGame } from "@quorum/game-engine";
 import { CreatedGame, CreateGameInput, GameId, HostToken } from "@quorum/protocol";
 import { signToken } from "@quorum/protocol/token";
@@ -18,14 +18,17 @@ export function gameRoutes(app: FastifyInstance, { db, redis, sessionSecret }: D
 
   api.post("/api/games", { schema: { body: CreateGameInput, response: { 201: CreatedGame, 404: z.null() } } }, async (request, reply) => {
     const [quiz] = await db
-      .select({ questions: quizzes.questions })
+      .select({ title: quizzes.title, questions: quizzes.questions })
       .from(quizzes)
       .where(and(eq(quizzes.id, request.body.quizId), eq(quizzes.ownerId, request.userId)));
     if (!quiz) return reply.code(404).send(null);
 
+    const { quizId, mode } = request.body;
     const gameId = GameId.parse(crypto.randomUUID());
     const pin = await reservePin(redis, gameId);
-    const state = createGame(pin, quiz.questions, request.body.mode, Math.random);
+    const state = createGame(pin, quiz.questions, mode, Math.random);
+    // D'abord en base : le worker y ajoutera les résultats de la partie (ADR 0014).
+    await db.insert(games).values({ id: gameId, ownerId: request.userId, quizId, title: quiz.title, mode, questions: state.questions });
     await redis
       .multi()
       .set(`game:${gameId}:state`, JSON.stringify(state), "EX", GAME_TTL_SECONDS)

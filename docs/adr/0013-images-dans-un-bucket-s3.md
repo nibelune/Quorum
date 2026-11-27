@@ -27,6 +27,6 @@ Option 3.
 
 - L'API reste sans état et peut passer à plusieurs instances.
 - Les images transitent par l'API. Des URL présignées éviteraient ce trafic, mais elles expirent et ne peuvent pas être stockées dans la question. Seul l'écran projeté affiche les images, une fois par question : le volume reste faible.
-- Une image retirée d'une question, ou celle d'un quiz supprimé, reste dans le bucket. Un job du `worker` pourra les nettoyer (phase 3).
+- Une image retirée d'une question, ou celle d'un quiz supprimé, reste dans le bucket jusqu'au passage du `worker` : chaque nuit, il supprime les images de plus d'un jour qu'aucun quiz ni aucune partie n'utilise. Pour les trouver sans lister le bucket, l'API inscrit chaque image envoyée dans la table `images`.
 - Le bucket n'est pas sauvegardé.
 - `adobe/s3mock` ne vérifie pas les signatures : c'est le déploiement qui valide l'accès au vrai bucket.

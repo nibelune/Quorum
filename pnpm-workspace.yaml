@@ -10,3 +10,5 @@ supportedArchitectures:
 # Le binaire d'esbuild (via drizzle-kit) arrive par ses dépendances optionnelles : son script d'installation est inutile.
 allowBuilds:
   esbuild: false
+  # Accélération native optionnelle de BullMQ : sans elle, msgpackr reste en JavaScript.
+  msgpackr-extract: false

@@ -1,6 +1,6 @@
 import { PROTOCOL_VERSION } from "@quorum/protocol";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { keys } from "./games.ts";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
+import { keys, parseJson } from "./games.ts";
 import { connect, connectHost, createTestGame, joinAs, question, startTestNode, visit } from "./testing.ts";
 
 let node: Awaited<ReturnType<typeof startTestNode>>;
@@ -124,8 +124,8 @@ describe("partie", () => {
     expect(await player.receive("error")).toEqual({ type: "error", code: "forbidden" });
   });
 
-  test("se joue du lobby au podium", async () => {
-    const { pin, hostToken } = await createTestGame(node.redis);
+  test("se joue du lobby au podium, puis confie ses résultats au worker", async () => {
+    const { gameId, pin, hostToken } = await createTestGame(node.redis);
     const host = await connectHost(node.url, hostToken);
     const { player } = await joinAs(node.url, pin, "Alice");
 
@@ -145,6 +145,13 @@ describe("partie", () => {
     expect((await player.receive("leaderboard")).you).toMatchObject({ rank: 1 });
     host.send({ type: "next" });
     expect((await host.receive("game_ended")).podium).toEqual([{ name: "Alice", score: ended.you?.score }]);
+
+    // Chaque fin de question est archivée, et la tâche porte l'identifiant de la partie.
+    const rounds = await node.redis.lrange(keys(gameId).rounds, 0, -1);
+    expect(rounds.map((round) => parseJson(round))).toMatchObject([{ type: "question_ended", questionId: question.id }]);
+    await vi.waitFor(async () => {
+      expect(await node.jobs.getJob(gameId)).toMatchObject({ name: "persist-game", data: { gameId } });
+    });
   });
 
   test("le chrono clôt la question à la deadline et tient l'animateur au courant des réponses", async () => {

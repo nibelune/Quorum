@@ -81,6 +81,18 @@ services:
       test: [CMD, node, -e, "fetch('http://localhost:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 2s
 
+  # Exécute les tâches de la file BullMQ : les résultats en fin de partie (ADR 0014), les images orphelines chaque nuit.
+  worker:
+    <<: *node
+    command: node --watch apps/worker/src/main.ts
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      s3:
+        condition: service_started
+
   web:
     <<: *node
     working_dir: /app/apps/web

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ChoiceIndex, Nickname, Pin, PlayerId, QuestionId, TeamId, TeamName } from "./domain.ts";
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 // En mode équipes, le joueur crée une équipe ou en rejoint une existante.
 export const TeamChoice = z.union([z.object({ create: TeamName }), z.object({ join: TeamId })]);

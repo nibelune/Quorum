@@ -109,7 +109,7 @@ describe("joueur", () => {
 
   test("la révélation garde la question et donne le résultat de son équipe", () => {
     const you = { points: 950, score: 950 };
-    const ended = reduceView(at(inQuestion(player)), { type: "question_ended", seq: 2, correctIndex: 0, distribution: [1, 0], you });
+    const ended = reduceView(at(inQuestion(player)), { type: "question_ended", seq: 2, questionId, correctIndex: 0, distribution: [1, 0], you });
     expect(stageOf(ended)).toEqual({ phase: "reveal", question, correctIndex: 0, distribution: [1, 0], you });
   });
 

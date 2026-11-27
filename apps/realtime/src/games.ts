@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { Command, GameState, type Recipient } from "@quorum/game-engine";
-import { ErrorCode, type GameId, type PlayerId, type ServerMessage, type TeamId } from "@quorum/protocol";
+import { ErrorCode, type GameId, type PersistGame, type PlayerId, type ServerMessage, type TeamId } from "@quorum/protocol";
+import type { Queue } from "bullmq";
 import type { Redis } from "ioredis";
 import type { Logger } from "pino";
 import { WebSocket } from "ws";
@@ -20,6 +21,8 @@ export interface Deps {
   logger: Logger;
   // Durée de vie du lease de coordination (5 s en production, plus courte dans les tests).
   leaseMs: number;
+  // File des tâches du worker : la persistance des résultats en fin de partie (ADR 0014).
+  jobs: Queue<PersistGame>;
 }
 
 // Le destinataire d'une connexion, et la partie qu'elle suit. Un visiteur a trouvé la partie par son PIN (`lookup`).
@@ -81,6 +84,8 @@ export function keys(gameId: GameId) {
     owner: `game:${gameId}:owner`,
     lease: `game:${gameId}:lease`,
     fence: `game:${gameId}:fence`,
+    // Les fins de question, archivées pour le worker : le stream des événements est plafonné.
+    rounds: `game:${gameId}:rounds`,
   };
 }
 

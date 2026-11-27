@@ -1,11 +1,12 @@
 import { ImageKey, ImageType, MAX_IMAGE_BYTES, UploadedImage } from "@quorum/protocol";
+import { images } from "@quorum/db";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { Deps } from "./app.ts";
 
 // Envoi réservé aux animateurs. Le corps de la requête est le fichier lui-même : pas de multipart, donc pas de dépendance.
-export function imageUploadRoutes(app: FastifyInstance, { storage }: Deps): void {
+export function imageUploadRoutes(app: FastifyInstance, { db, storage }: Deps): void {
   app.addContentTypeParser(ImageType.options, { parseAs: "buffer", bodyLimit: MAX_IMAGE_BYTES }, (_request, body, done) => {
     done(null, body);
   });
@@ -17,6 +18,8 @@ export function imageUploadRoutes(app: FastifyInstance, { storage }: Deps): void
     async (request, reply) => {
       const type = request.headers["content-type"];
       const key = `${crypto.randomUUID()}.${type.slice("image/".length)}`;
+      // Inscrite avant l'envoi : une image orpheline est toujours connue du worker, qui la supprimera (ADR 0013).
+      await db.insert(images).values({ key });
       const response = await storage.client.fetch(`${storage.bucketUrl}/${key}`, {
         method: "PUT",
         body: request.body,

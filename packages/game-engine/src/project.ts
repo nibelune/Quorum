@@ -26,7 +26,9 @@ export function project(event: GameEvent, to: Recipient): ServerMessage | null {
     case "question_ended": {
       if (to.role === "visitor") return null;
       const { results, ...message } = event;
-      return to.role === "host" ? message : { ...message, you: results[to.teamId] };
+      if (to.role === "host") return message;
+      const result = results[to.teamId];
+      return { ...message, you: result && { points: result.points, score: result.score } };
     }
     case "leaderboard": {
       if (to.role === "visitor") return null;

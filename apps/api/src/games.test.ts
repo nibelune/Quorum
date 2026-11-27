@@ -1,12 +1,15 @@
+import { createDb, games } from "@quorum/db";
 import { GameState } from "@quorum/game-engine";
 import { CreatedGame, type GameMode, HostToken, Quiz } from "@quorum/protocol";
 import { verifyToken } from "@quorum/protocol/token";
+import { eq } from "drizzle-orm";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { signUp, TEST_REDIS_URL, TEST_SECRET, testApp } from "./testing.ts";
+import { signUp, TEST_DATABASE_URL, TEST_REDIS_URL, TEST_SECRET, testApp } from "./testing.ts";
 
 const app = testApp();
 const redis = new Redis(TEST_REDIS_URL);
+const db = createDb(TEST_DATABASE_URL);
 let cookie: string;
 let quiz: Quiz;
 
@@ -23,6 +26,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   redis.disconnect();
+  await db.$client.end();
   await app.close();
 });
 
@@ -35,6 +39,9 @@ test.each<GameMode>(["solo", "teams"])("crée une partie en mode %s avec un PIN 
   const state = GameState.parse(JSON.parse((await redis.get(`game:${gameId}:state`)) ?? "null"));
   // Les questions, mélangées, sont vérifiées à part.
   expect(state).toMatchObject({ pin, mode, seq: 0, players: [], teams: [], current: { phase: "lobby" } });
+  // La partie est aussi enregistrée en base, avec les questions telles qu'elles seront jouées.
+  const [row] = await db.select().from(games).where(eq(games.id, gameId));
+  expect(row).toMatchObject({ quizId: quiz.id, title: "Quiz", mode, questions: state.questions, endedAt: null });
   expect(await redis.get(`pin:${pin}`)).toBe(gameId);
   expect(await redis.ttl(`game:${gameId}:state`)).toBeGreaterThan(0);
 });
