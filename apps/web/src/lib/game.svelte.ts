@@ -1,6 +1,6 @@
 import { type ClientMessage, type ErrorCode, PROTOCOL_VERSION, ServerMessage } from "@quorum/protocol";
 import { clockOffset, offsetSample } from "./clock.ts";
-import { reduceView, type View } from "./view.ts";
+import { type GameInfo, reduceView, type View } from "./view.ts";
 
 const CLOCK_SAMPLES = 5;
 
@@ -8,7 +8,7 @@ interface Options {
   token?: string | undefined;
   onOpen?: (game: GameConnection) => void;
   // Réponse à `lookup` : le joueur sait s'il doit choisir une équipe avant de rejoindre.
-  onGameInfo?: (game: GameConnection, info: Extract<ServerMessage, { type: "game_info" }>) => void;
+  onGameInfo?: (game: GameConnection, info: GameInfo) => void;
   onWelcome?: (token: string) => void;
   onError?: (code: ErrorCode) => void;
   // Écran projeté : redemande un jeton animateur à l'API quand le sien a expiré.

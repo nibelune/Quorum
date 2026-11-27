@@ -28,9 +28,13 @@ export const MAX_CHOICES = 4;
 
 export const ChoiceIndex = z.int().min(0).max(MAX_CHOICES - 1);
 
-// Une image envoyée à l'API (ADR 0013) : seules les URL qu'elle délivre sont acceptées, jamais celles d'un site tiers.
+// Images envoyées à l'API (ADR 0013). Pas de SVG : il peut contenir du script.
+export const ImageType = z.enum(["image/jpeg", "image/png", "image/webp"]);
 export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
-export const ImageUrl = z.string().regex(/^\/api\/images\/[0-9a-f-]{36}\.(jpeg|png|webp)$/);
+// Le nom d'une image stockée : un UUID suivi du sous-type, qui redonne son Content-Type.
+export const ImageKey = z.string().regex(/^[0-9a-f-]{36}\.(jpeg|png|webp)$/);
+// Seules les URL délivrées par l'API sont acceptées dans une question, jamais celles d'un site tiers.
+export const ImageUrl = z.templateLiteral(["/api/images/", ImageKey]);
 
 // Une question vrai/faux est un QCM à deux choix.
 export const QuestionContent = z

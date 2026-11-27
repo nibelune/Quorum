@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";
-import { type Command, snapshot } from "@quorum/game-engine";
+import { type Command, joinedTeamId, snapshot } from "@quorum/game-engine";
 import { ClientMessage, type ErrorCode, GameId, PlayerId, PROTOCOL_VERSION, TeamId } from "@quorum/protocol";
 import { signToken, verifyToken } from "@quorum/protocol/token";
 import type { RawData, WebSocket } from "ws";
@@ -12,7 +12,6 @@ import {
   type Identity,
   type Node,
   parseJson,
-  recipientOf,
   release,
   type Reply,
   send,
@@ -123,10 +122,16 @@ async function handleMessage(node: Node, client: Client, data: RawData): Promise
       }
       const { gameId } = identity;
       const { nickname, team } = message;
-      const playerId = PlayerId.parse(randomUUID());
-      const newTeamId = TeamId.parse(randomUUID());
-      client.joining = { gameId, playerId, teamId: team && "join" in team ? team.join : newTeamId };
-      await addCommand(deps, gameId, { type: "join", at: now, playerId, nickname, newTeamId, team }, client);
+      const command: Extract<Command, { type: "join" }> = {
+        type: "join",
+        at: now,
+        playerId: PlayerId.parse(randomUUID()),
+        nickname,
+        newTeamId: TeamId.parse(randomUUID()),
+        team,
+      };
+      client.joining = { gameId, playerId: command.playerId, teamId: joinedTeamId(command) };
+      await addCommand(deps, gameId, command, client);
       return;
     }
     case "answer": {
@@ -183,17 +188,16 @@ async function attach(node: Node, client: Client, identity: Identity, lastSeq?: 
     fail(client, "game_not_found");
     return;
   }
-  const recipient = recipientOf(identity);
   client.identity = identity;
   client.log = node.deps.logger.child({
     connId: client.id,
     gameId: game.id,
-    ...(recipient.role === "player" && { playerId: recipient.playerId }),
+    ...(identity.role === "player" && { playerId: identity.playerId }),
   });
   if (lastSeq !== undefined) {
     // Reconnexion : la diffusion lui renvoie les événements manqués, ou un snapshot s'ils ont été purgés du stream.
     client.position = lastSeq;
-    game.clients.set(client, recipient);
+    game.clients.set(client, identity);
     return;
   }
   const state = await currentState(node.deps, game);
@@ -202,9 +206,9 @@ async function attach(node: Node, client: Client, identity: Identity, lastSeq?: 
     return;
   }
   // Les événements diffusés pendant la lecture de l'état seront rattrapés à partir de cette position.
-  const message = snapshot(state, recipient);
+  const message = snapshot(state, identity);
   client.position = state.seq;
-  game.clients.set(client, recipient);
+  game.clients.set(client, identity);
   send(client, message);
   if (message.type === "error") client.socket.close();
 }

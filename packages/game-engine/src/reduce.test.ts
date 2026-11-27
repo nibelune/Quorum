@@ -238,14 +238,19 @@ describe("mode équipes", () => {
   const teamLobby = [createTeam(alice, "Alice", red, "Rouges"), joinTeam(bob, "Bob", red), createTeam(carol, "Carol", blue, "Bleus")];
   const teamQuestion = [...teamLobby, host("start")];
 
-  test("le joueur crée une équipe ou en rejoint une, et l'annonce avec son équipe", () => {
+  test("le joueur crée une équipe ou en rejoint une ; seules les créations sont annoncées aux visiteurs", () => {
     const { state, events } = playTeams(...teamLobby);
+    const reds = { teamId: red, name: "Rouges" };
     expect(state.teams).toEqual([
-      { teamId: red, name: "Rouges", score: 0 },
+      { ...reds, score: 0 },
       { teamId: blue, name: "Bleus", score: 0 },
     ]);
     expect(state.players.map(({ teamId }) => teamId)).toEqual([red, red, blue]);
-    expect(events[1]).toEqual({ type: "player_joined", seq: 2, playerId: bob, nickname: "Bob", team: { teamId: red, name: "Rouges" } });
+    expect(events.slice(0, 3)).toEqual([
+      { type: "team_created", seq: 1, team: reds },
+      { type: "player_joined", seq: 2, playerId: alice, nickname: "Alice", team: reds },
+      { type: "player_joined", seq: 3, playerId: bob, nickname: "Bob", team: reds },
+    ]);
   });
 
   test("accepte un retardataire dans une équipe existante", () => {
@@ -265,7 +270,7 @@ describe("mode équipes", () => {
   test("annonce le choix du capitaine à ses coéquipiers, et seulement s'il en a", () => {
     expect(playTeams(...teamQuestion, answer(alice, 1)).events.at(-1)).toEqual({
       type: "team_answer_locked",
-      seq: 5,
+      seq: 7,
       teamId: red,
       choiceIndex: 1,
     });
@@ -283,14 +288,14 @@ describe("mode équipes", () => {
   test("un capitaine exclu laisse sa place au membre arrivé le plus tôt, qui répond à son tour", () => {
     const { state, events } = playTeams(...teamQuestion, answer(alice, 1), kick(alice));
     expect(events.slice(-2)).toEqual([
-      { type: "player_left", seq: 6, playerId: alice },
-      { type: "captain_changed", seq: 7, teamId: red, captain: "Bob" },
+      { type: "player_left", seq: 8, playerId: alice },
+      { type: "captain_changed", seq: 9, teamId: red, captain: "Bob" },
     ]);
     expect(reduce(state, answer(bob, 2)).ok).toBe(true);
   });
 
   test("exclure un simple membre ne change pas de capitaine", () => {
-    expect(playTeams(...teamLobby, kick(bob)).events.at(-1)).toEqual({ type: "player_left", seq: 4, playerId: bob });
+    expect(playTeams(...teamLobby, kick(bob)).events.at(-1)).toEqual({ type: "player_left", seq: 6, playerId: bob });
   });
 
   test("une équipe vide disparaît", () => {

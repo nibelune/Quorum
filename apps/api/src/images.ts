@@ -1,12 +1,8 @@
-import { MAX_IMAGE_BYTES, UploadedImage } from "@quorum/protocol";
+import { ImageKey, ImageType, MAX_IMAGE_BYTES, UploadedImage } from "@quorum/protocol";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { Deps } from "./app.ts";
-
-// Pas de SVG : il peut contenir du script. L'extension du fichier stocké est le sous-type, qui redonne le Content-Type.
-const ImageType = z.enum(["image/jpeg", "image/png", "image/webp"]);
-const ImageKey = z.string().regex(/^[0-9a-f-]{36}\.(jpeg|png|webp)$/);
 
 // Envoi réservé aux animateurs. Le corps de la requête est le fichier lui-même : pas de multipart, donc pas de dépendance.
 export function imageUploadRoutes(app: FastifyInstance, { storage }: Deps): void {
@@ -43,9 +39,9 @@ export function imageRoutes(app: FastifyInstance, { storage }: Deps): void {
     if (!response.ok) throw new Error(`Le stockage n'a pas rendu l'image : ${String(response.status)}`);
     // Une image ne change jamais sous le même nom : le navigateur la garde en cache.
     return reply
-      .header("content-type", `image/${key.split(".")[1] ?? ""}`)
+      .header("content-type", `image/${key.slice(key.indexOf(".") + 1)}`)
       .header("cache-control", "public, max-age=31536000, immutable")
       .header("x-content-type-options", "nosniff")
-      .send(Buffer.from(await response.arrayBuffer()));
+      .send(response.body);
   });
 }

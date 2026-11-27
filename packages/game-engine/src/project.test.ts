@@ -25,18 +25,20 @@ const toVisitor: Recipient = { role: "visitor" };
 const toPlayer = (playerId: PlayerId, teamId: TeamId = soloTeam(playerId)): Recipient => ({ role: "player", playerId, teamId });
 
 describe("project", () => {
-  test("player_joined va à l'animateur et aux visiteurs, qui suivent les équipes", () => {
-    const event: GameEvent = { type: "player_joined", seq: 1, playerId: alice, nickname: "Alice", team: { teamId: red, name: "Rouges" } };
-    expect(project(event, toHost)).toBe(event);
-    expect(project(event, toVisitor)).toBe(event);
-    expect(project(event, toPlayer(alice))).toBeNull();
-  });
-
-  test("answer_count ne va qu'à l'animateur", () => {
-    const event: GameEvent = { type: "answer_count", seq: 4, count: 1 };
+  test.each<GameEvent>([
+    { type: "player_joined", seq: 1, playerId: alice, nickname: "Alice", team: { teamId: red, name: "Rouges" } },
+    { type: "answer_count", seq: 4, count: 1 },
+  ])("$type ne va qu'à l'animateur", (event) => {
     expect(project(event, toHost)).toBe(event);
     expect(project(event, toPlayer(alice))).toBeNull();
     expect(project(event, toVisitor)).toBeNull();
+  });
+
+  test("team_created ne va qu'aux visiteurs, qui choisissent leur équipe", () => {
+    const event: GameEvent = { type: "team_created", seq: 1, team: { teamId: red, name: "Rouges" } };
+    expect(project(event, toVisitor)).toBe(event);
+    expect(project(event, toHost)).toBeNull();
+    expect(project(event, toPlayer(alice))).toBeNull();
   });
 
   test("player_left va à l'animateur et prévient le joueur exclu", () => {

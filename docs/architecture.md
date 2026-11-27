@@ -84,7 +84,7 @@ Messages JSON validés par zod, union discriminée sur `type`. Taille maximale :
 - Animateur : `start`, `next`, `kick { playerId }`, `end`
 
 **Serveur -> client**
-- Issus du flux d'événements, avec `seq` : `player_joined { playerId, nickname, team }` (animateur et visiteurs), `player_left`, `captain_changed { captain }` et `team_answer_locked { choiceIndex }` (équipe concernée uniquement), `question_started { questionId, text, choices, imageUrl?, deadline }`, `answer_count` (animateur), `question_ended { correctIndex, distribution, you? }`, `leaderboard { top, you? }`, `game_ended { podium }`. `you`, `top` et `podium` portent sur les équipes (en solo, celles d'un membre) : une ligne de classement est `{ name, score }`.
+- Issus du flux d'événements, avec `seq` : `player_joined { playerId, nickname, team }` (animateur), `team_created { team }` (visiteurs, en mode équipes), `player_left`, `captain_changed { captain }` et `team_answer_locked { choiceIndex }` (équipe concernée uniquement), `question_started { questionId, text, choices, imageUrl?, deadline }`, `answer_count` (animateur), `question_ended { correctIndex, distribution, you? }`, `leaderboard { top, you? }`, `game_ended { podium }`. `you`, `top` et `podium` portent sur les équipes (en solo, celles d'un membre) : une ligne de classement est `{ name, score }`.
 - Locaux au nœud, sans `seq` : `game_info { mode, teams, canCreateTeam }` (réponse à `lookup` ; en solo, aucune équipe à choisir), `welcome { token }` (réponse à `join`), `snapshot { seq, view }`, `answer_received`, `pong { t, serverTime }`, `error { code }`, `reload`
 
 Si `protocolVersion` ne correspond pas, le serveur répond `reload` : le client recharge la page. Ça évite les incohérences après un déploiement.
@@ -111,7 +111,7 @@ Chaque partie a un **coordinateur** : le seul nœud qui applique les commandes e
 4. Chaque nœud lit les streams d'événements des parties dont il sert au moins un client. Pour chaque socket locale, il applique `project` et envoie le résultat.
 5. Un refus de `reduce` (`nickname_taken`, `too_late`...) et un `join` accepté appellent une réponse individuelle. Après le `commit`, le coordinateur la publie sur `node:{nodeId}:replies`, le canal Pub/Sub du nœud qui a reçu la commande (ADR 0010). Ce nœud envoie `error` à la socket, ou `welcome` puis `snapshot` pour un `join`.
 
-Seule exception, `lookup` est une lecture : il ne passe pas par le coordinateur. Le nœud lit l'état dans Redis et répond avec la vue `visitor` (mode et équipes, rien d'autre). La connexion reste ensuite abonnée à la partie comme visiteur : elle reçoit `player_joined`, ce qui tient la liste des équipes à jour, et son `join` vise la partie trouvée. Un `join` refusé (pseudo pris...) la laisse visiteur, prête à réessayer.
+Seule exception, `lookup` est une lecture : il ne passe pas par le coordinateur. Le nœud lit l'état dans Redis et répond avec la vue `visitor` (mode et équipes, rien d'autre). La connexion reste ensuite abonnée à la partie comme visiteur : elle reçoit `team_created`, ce qui tient la liste des équipes à jour sans lui envoyer chaque arrivée de joueur, et son `join` vise la partie trouvée. Un `join` refusé (pseudo pris...) la laisse visiteur, prête à réessayer.
 
 Le chrono passe par le même chemin : pendant une question, le coordinateur ajoute une commande `tick` toutes les 250 ms. Elle émet `answer_count` si le nombre de réponses a changé, et clôt la question une fois `deadline + GRACE_MS` dépassé.
 

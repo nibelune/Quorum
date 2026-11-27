@@ -27,7 +27,9 @@
   onDestroy(() => game?.close());
 
   const view = $derived(game?.view?.role === "host" ? game.view : null);
-  const joinUrl = $derived(view ? new URL(`/play?pin=${view.pin}`, env["PUBLIC_ORIGIN"] ?? location.origin) : null);
+  // Dérivé du seul PIN : le QR code n'est pas régénéré à chaque arrivée de joueur.
+  const pin = $derived(view?.pin);
+  const joinUrl = $derived(pin ? new URL(`/play?pin=${pin}`, env["PUBLIC_ORIGIN"] ?? location.origin) : null);
   const qrCode = $derived(joinUrl ? qrSvg(joinUrl.href, { type: "svg", margin: 1 }) : null);
 
   function send(message: ClientMessage) {
@@ -312,10 +314,15 @@
     gap: 2rem;
   }
 
-  .stage header {
+  /* Bandeaux lisibles quelle que soit l'image derrière. */
+  .stage header,
+  .stage footer p {
     border-radius: var(--radius);
-    padding: 1rem 1.5rem;
     background: rgb(0 0 0 / 55%);
+  }
+
+  .stage header {
+    padding: 1rem 1.5rem;
   }
 
   .stage h1 {
@@ -330,9 +337,7 @@
 
   .stage footer p {
     margin: 0;
-    border-radius: var(--radius);
     padding: 0.5rem 1rem;
-    background: rgb(0 0 0 / 55%);
   }
 
   .choices {

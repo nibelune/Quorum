@@ -1,4 +1,4 @@
-import type { ErrorCode } from "@quorum/protocol";
+import type { ErrorCode, TeamId } from "@quorum/protocol";
 import {
   captainOf,
   deadlineOf,
@@ -9,14 +9,16 @@ import {
   questionAt,
   rankOf,
   shownQuestion,
+  teamRef,
   top,
 } from "./rules.ts";
-import type { Command, GameEvent, GameState, Player, Team } from "./state.ts";
+import type { Command, GameEvent, GameState, Team } from "./state.ts";
 
 export type ReduceResult = { ok: true; state: GameState; events: GameEvent[] } | { ok: false; error: ErrorCode };
 
 type Unsequenced<E> = E extends unknown ? Omit<E, "seq"> : never;
 type QuestionRound = Extract<GameState["current"], { phase: "question" }>;
+type JoinCommand = Extract<Command, { type: "join" }>;
 
 export function reduce(state: GameState, command: Command): ReduceResult {
   const { current } = state;
@@ -48,28 +50,42 @@ export function reduce(state: GameState, command: Command): ReduceResult {
   }
 }
 
-function join(state: GameState, command: Extract<Command, { type: "join" }>): ReduceResult {
-  const { playerId, nickname, newTeamId, team } = command;
+// L'équipe d'un joueur dont le `join` est accepté : celle qu'il a choisie, ou celle qu'il crée. `realtime` l'inscrit dans son jeton.
+export function joinedTeamId({ team, newTeamId }: JoinCommand): TeamId {
+  return team && "join" in team ? team.join : newTeamId;
+}
+
+function join(state: GameState, command: JoinCommand): ReduceResult {
+  const { nickname, team } = command;
   if (state.current.phase === "ended") return rejected("wrong_phase");
   if (isTaken(state.players.map((player) => player.nickname), nickname)) return rejected("nickname_taken");
   // En mode équipes, le joueur choisit son équipe. En solo, il en crée une à son nom.
   if ((state.mode === "teams") !== (team !== undefined)) return rejected("invalid_message");
+  const teamId = joinedTeamId(command);
   if (team && "join" in team) {
-    const joined = state.teams.find(({ teamId }) => teamId === team.join);
+    const joined = state.teams.find((existing) => existing.teamId === teamId);
     if (!joined) return rejected("team_not_found");
-    return addPlayer(state, { playerId, nickname, teamId: joined.teamId }, joined);
+    return addPlayer(state, command, joined);
   }
   if (team && state.current.phase !== "lobby") return rejected("wrong_phase");
   const name = team?.create ?? nickname;
   if (isTaken(state.teams.map((existing) => existing.name), name)) return rejected("team_name_taken");
-  const created = { teamId: newTeamId, name, score: 0 };
-  return addPlayer({ ...state, teams: [...state.teams, created] }, { playerId, nickname, teamId: newTeamId }, created);
+  const created = { teamId, name, score: 0 };
+  // Les visiteurs suivent les équipes créées, pour rejoindre la leur. En solo, l'équipe d'un membre reste implicite.
+  const announcement = team ? [{ type: "team_created", team: teamRef(created) } as const] : [];
+  return addPlayer({ ...state, teams: [...state.teams, created] }, command, created, ...announcement);
 }
 
-function addPlayer(state: GameState, player: Player, { teamId, name }: Team): ReduceResult {
+function addPlayer(
+  state: GameState,
+  { playerId, nickname }: JoinCommand,
+  team: Team,
+  ...announcement: Unsequenced<GameEvent>[]
+): ReduceResult {
   return emit(
-    { ...state, players: [...state.players, player] },
-    { type: "player_joined", playerId: player.playerId, nickname: player.nickname, team: { teamId, name } },
+    { ...state, players: [...state.players, { playerId, nickname, teamId: team.teamId }] },
+    ...announcement,
+    { type: "player_joined", playerId, nickname, team: teamRef(team) },
   );
 }
 
@@ -109,18 +125,18 @@ function kick(state: GameState, command: Extract<Command, { type: "kick" }>): Re
   if (!player) return withoutEvent(state);
   const { playerId, teamId } = player;
   const players = state.players.filter((other) => other.playerId !== playerId);
+  const successor = players.find((other) => other.teamId === teamId);
   const kicked = {
     ...state,
     players,
     // Une équipe vide disparaît.
-    teams: players.some((other) => other.teamId === teamId) ? state.teams : state.teams.filter((team) => team.teamId !== teamId),
+    teams: successor ? state.teams : state.teams.filter((team) => team.teamId !== teamId),
     current:
       current.phase === "question"
         ? { ...current, answers: current.answers.filter((answer) => answer.playerId !== playerId) }
         : current,
   };
   // La réponse d'un capitaine exclu part avec lui : son successeur, le membre arrivé le plus tôt, répond à sa place.
-  const successor = captainOf(kicked, teamId);
   if (successor && captainOf(state, teamId)?.playerId === playerId) {
     return emit(kicked, { type: "player_left", playerId }, { type: "captain_changed", teamId, captain: successor.nickname });
   }

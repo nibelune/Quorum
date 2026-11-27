@@ -181,7 +181,7 @@ describe("mode équipes", () => {
     expect(info).toEqual({ type: "game_info", mode: "teams", teams: [], canCreateTeam: true });
 
     await joinAs(node.url, pin, "Alice", { team: { create: "Rouges" } });
-    const { team } = await visitor.receive("player_joined");
+    const { team } = await visitor.receive("team_created");
     expect(team.name).toBe("Rouges");
 
     visitor.send({ type: "join", nickname: "Bob", team: { join: team.teamId } });

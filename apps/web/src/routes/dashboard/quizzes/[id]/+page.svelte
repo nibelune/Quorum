@@ -4,7 +4,7 @@
   import { page } from "$app/state";
   import ChoiceShape from "$lib/ChoiceShape.svelte";
   import { api } from "$lib/api";
-  import { MAX_CHOICES, MAX_IMAGE_BYTES, Quiz, QuizInput, UploadedImage } from "@quorum/protocol";
+  import { ImageType, MAX_CHOICES, MAX_IMAGE_BYTES, Quiz, QuizInput, UploadedImage } from "@quorum/protocol";
   import { z } from "zod";
 
   type DraftQuestion = QuizInput["questions"][number];
@@ -101,7 +101,7 @@
               Image (facultative : JPEG, PNG ou WebP, 2 Mo au plus)
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept={ImageType.options.join()}
                 onchange={(event) => {
                   void upload(question, event.currentTarget);
                 }}

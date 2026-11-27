@@ -1,6 +1,6 @@
 import type { ServerMessage, Stage, Team } from "@quorum/protocol";
 
-type GameInfo = Extract<ServerMessage, { type: "game_info" }>;
+export type GameInfo = Extract<ServerMessage, { type: "game_info" }>;
 
 // Avant de rejoindre, le joueur est un visiteur : il connaît le mode de la partie et choisit son équipe.
 export type View = Extract<ServerMessage, { type: "snapshot" }>["view"] | ({ role: "visitor" } & Omit<GameInfo, "type">);
@@ -24,8 +24,8 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
   const seq = "seq" in message ? message.seq : state.seq;
   // Le visiteur ne suit que les équipes créées, pour pouvoir rejoindre la sienne.
   if (view.role === "visitor") {
-    if (message.type !== "player_joined") return state;
-    return { seq, view: { ...view, teams: withTeam(view.teams, message.team) } };
+    if (message.type !== "team_created") return state;
+    return { seq, view: { ...view, teams: [...view.teams, message.team] } };
   }
   const { stage } = view;
 
@@ -78,6 +78,7 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
       return { seq, view: { ...view, stage: { phase: "leaderboard", top: message.top, you: message.you } } };
     case "game_ended":
       return { seq, view: { ...view, stage: { phase: "ended", podium: message.podium } } };
+    case "team_created":
     case "welcome":
     case "pong":
     case "reload":

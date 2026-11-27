@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { quizzes } from "@quorum/db";
-import { createGame, shuffleChoices } from "@quorum/game-engine";
+import { createGame } from "@quorum/game-engine";
 import { CreatedGame, CreateGameInput, GameId, HostToken } from "@quorum/protocol";
 import { signToken } from "@quorum/protocol/token";
 import { and, eq } from "drizzle-orm";
@@ -25,10 +25,10 @@ export function gameRoutes(app: FastifyInstance, { db, redis, sessionSecret }: D
 
     const gameId = GameId.parse(crypto.randomUUID());
     const pin = await reservePin(redis, gameId);
-    const questions = quiz.questions.map((question) => shuffleChoices(question, Math.random));
+    const state = createGame(pin, quiz.questions, request.body.mode, Math.random);
     await redis
       .multi()
-      .set(`game:${gameId}:state`, JSON.stringify(createGame(pin, questions, request.body.mode)), "EX", GAME_TTL_SECONDS)
+      .set(`game:${gameId}:state`, JSON.stringify(state), "EX", GAME_TTL_SECONDS)
       .set(`game:${gameId}:owner`, request.userId, "EX", GAME_TTL_SECONDS)
       .exec();
     return reply.code(201).send({ gameId, pin });

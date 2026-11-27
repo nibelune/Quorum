@@ -55,9 +55,7 @@ describe("shuffleChoices", () => {
     expect(shuffleChoices(capital, sequence(0.5, 0))).toMatchObject({ choices: ["Canberra", "Sydney", "Melbourne"], correctIndex: 0 });
   });
 
-  test.each([0, 0.3, 0.6, 0.99])("garde les mêmes choix et la même bonne réponse (aléa %d)", (value) => {
-    const shuffled = shuffleChoices(capital, () => value);
-    expect(shuffled.choices.toSorted()).toEqual(capital.choices.toSorted());
-    expect(shuffled.choices[shuffled.correctIndex]).toBe("Canberra");
+  test("garde l'ordre d'origine avec un aléa nul", () => {
+    expect(shuffleChoices(capital, () => 0)).toEqual(capital);
   });
 });

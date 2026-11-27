@@ -11,8 +11,7 @@ export function questionAt(state: GameState, index: number): Question {
   return question;
 }
 
-// Mélange les choix une fois pour toute la partie : l'écran projeté et les téléphones les montrent dans le même ordre.
-// L'aléa est fourni par l'appelant, comme l'heure : le moteur reste déterministe.
+// L'aléa est fourni par l'appelant, comme l'heure : le moteur reste déterministe. `() => 0` garde l'ordre d'origine.
 export function shuffleChoices(question: Question, random: () => number): Question {
   const remaining = question.choices.map((text, index) => ({ text, correct: index === question.correctIndex }));
   const shuffled: typeof remaining = [];
@@ -44,6 +43,11 @@ export function pointsFor(question: Question, startedAt: number, answer: Answer 
 
 export function distribution(question: Question, answers: Answer[]): number[] {
   return question.choices.map((_, index) => answers.filter((answer) => answer.choiceIndex === index).length);
+}
+
+// Une équipe telle qu'elle est annoncée, sans son score.
+export function teamRef({ teamId, name }: Team) {
+  return { teamId, name };
 }
 
 // Le membre arrivé le plus tôt : le créateur de l'équipe, puis le plus ancien s'il est exclu.

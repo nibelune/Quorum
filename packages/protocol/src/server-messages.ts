@@ -80,6 +80,8 @@ export type ErrorCode = z.infer<typeof ErrorCode>;
 
 export const ServerMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("player_joined"), seq: Seq, playerId: PlayerId, nickname: Nickname, team: Team }),
+  // Pour les visiteurs : la liste des équipes à rejoindre se met à jour.
+  z.object({ type: z.literal("team_created"), seq: Seq, team: Team }),
   z.object({ type: z.literal("captain_changed"), seq: Seq, captain: Nickname }),
   z.object({ type: z.literal("player_left"), seq: Seq, playerId: PlayerId }),
   z.object({ type: z.literal("question_started"), seq: Seq, ...ShownQuestion.shape }),
@@ -88,7 +90,7 @@ export const ServerMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("question_ended"), seq: Seq, ...Reveal }),
   z.object({ type: z.literal("leaderboard"), seq: Seq, ...Leaderboard }),
   z.object({ type: z.literal("game_ended"), seq: Seq, podium: z.array(Standing) }),
-  // Réponse à `lookup`. En solo, il n'y a pas d'équipe à choisir.
+  // Réponse à `lookup`.
   z.object({ type: z.literal("game_info"), mode: GameMode, teams: z.array(Team), canCreateTeam: z.boolean() }),
   z.object({ type: z.literal("welcome"), token: z.string() }),
   z.object({ type: z.literal("snapshot"), seq: Seq, view: View }),

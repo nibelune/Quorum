@@ -56,7 +56,8 @@ export async function createTestGame(redis: Redis, mode: GameMode = "solo") {
   const gameId = GameId.parse(crypto.randomUUID());
   const pin = String(randomInt(0, 1_000_000)).padStart(6, "0");
   await redis.set(`pin:${pin}`, gameId);
-  await redis.set(keys(gameId).state, JSON.stringify(createGame(pin, [question], mode)));
+  // `() => 0` garde l'ordre des choix : les tests savent que le premier est « Vrai ».
+  await redis.set(keys(gameId).state, JSON.stringify(createGame(pin, [question], mode, () => 0)));
   const hostToken = signToken({ role: "host", gameId, exp: Date.now() + 60_000 }, SECRET);
   return { gameId, pin, hostToken };
 }
@@ -148,6 +149,6 @@ export async function joinAs(
   const { visitor: player } = await visit(url, pin, headers);
   player.send({ type: "join", nickname, team });
   const { token } = await player.receive("welcome");
-  const { view } = await player.receive("snapshot");
-  return { player, token, view };
+  await player.receive("snapshot");
+  return { player, token };
 }

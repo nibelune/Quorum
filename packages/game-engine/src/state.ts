@@ -13,6 +13,7 @@ import {
   TeamId,
 } from "@quorum/protocol";
 import { z } from "zod";
+import { shuffleChoices } from "./rules.ts";
 
 const Timestamp = z.int();
 const Count = z.int().nonnegative();
@@ -76,6 +77,7 @@ const Seq = z.int().positive();
 export const GameEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("player_joined"), seq: Seq, playerId: PlayerId, nickname: Nickname, team: TeamRef }),
   z.object({ type: z.literal("player_left"), seq: Seq, playerId: PlayerId }),
+  z.object({ type: z.literal("team_created"), seq: Seq, team: TeamRef }),
   z.object({ type: z.literal("captain_changed"), seq: Seq, teamId: TeamId, captain: Nickname }),
   z.object({ type: z.literal("team_answer_locked"), seq: Seq, teamId: TeamId, choiceIndex: ChoiceIndex }),
   z.object({ type: z.literal("question_started"), seq: Seq, ...ShownQuestion.shape }),
@@ -97,6 +99,8 @@ export const GameEvent = z.discriminatedUnion("type", [
 ]);
 export type GameEvent = z.infer<typeof GameEvent>;
 
-export function createGame(pin: string, questions: Question[], mode: GameMode): GameState {
-  return { pin, mode, questions, seq: 0, players: [], teams: [], current: { phase: "lobby" } };
+// Les choix de chaque question sont mélangés une fois pour la partie : l'ordre de l'auteur ne se retrouve pas à l'écran.
+export function createGame(pin: string, questions: Question[], mode: GameMode, random: () => number): GameState {
+  const shuffled = questions.map((question) => shuffleChoices(question, random));
+  return { pin, mode, questions: shuffled, seq: 0, players: [], teams: [], current: { phase: "lobby" } };
 }

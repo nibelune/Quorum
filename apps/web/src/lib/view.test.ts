@@ -1,4 +1,4 @@
-import { PlayerId, QuestionId, type ServerMessage, type Stage, TeamId } from "@quorum/protocol";
+import { PlayerId, QuestionId, type ServerMessage, type ShownQuestion, type Stage, TeamId } from "@quorum/protocol";
 import { describe, expect, test } from "vitest";
 import { reduceView, type View, type ViewState } from "./view.ts";
 
@@ -6,7 +6,7 @@ const alice = PlayerId.parse(crypto.randomUUID());
 const bob = PlayerId.parse(crypto.randomUUID());
 const reds = { teamId: TeamId.parse(crypto.randomUUID()), name: "Rouges" };
 const questionId = QuestionId.parse(crypto.randomUUID());
-const question = {
+const question: ShownQuestion = {
   questionId,
   text: "La Terre est ronde.",
   choices: ["Vrai", "Faux"],
@@ -42,9 +42,8 @@ test("un événement déjà couvert par le seq reçu est ignoré", () => {
 
 test("un visiteur voit les équipes de la partie, puis celles qui se créent", () => {
   const visiting = reduceView({ view: null, seq: 0 }, { type: "game_info", mode: "teams", teams: [], canCreateTeam: true });
-  const created = reduceView(visiting, joined(alice, "Alice", 1));
+  const created = reduceView(visiting, { type: "team_created", seq: 1, team: reds });
   expect(created.view).toEqual({ role: "visitor", mode: "teams", teams: [reds], canCreateTeam: true });
-  expect(reduceView(created, joined(bob, "Bob", 2)).view).toMatchObject({ teams: [reds] });
 });
 
 describe("animateur", () => {

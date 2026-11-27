@@ -96,14 +96,11 @@
         <p class="text">{stage.question.text}</p>
         <ul class="answers">
           {#each choices as { index, text }, position (index)}
-            {@const locked = stage.teamAnswer !== undefined}
-            <li
-              style:--color="var(--choice-{position})"
-              class={{ picked: stage.teamAnswer === index, faded: locked && stage.teamAnswer !== index }}
-            >
+            {@const picked = stage.teamAnswer === index}
+            <li style:--color="var(--choice-{position})" class={{ picked, faded: stage.teamAnswer !== undefined && !picked }}>
               <ChoiceShape index={position} size="2.5rem" />
               <span>{text}</span>
-              {#if stage.teamAnswer === index}<strong class="pick">Choix de l'équipe</strong>{/if}
+              {#if picked}<strong class="pick">Choix de l'équipe</strong>{/if}
             </li>
           {/each}
         </ul>
@@ -251,7 +248,7 @@
     font-weight: 700;
   }
 
-  /* Mêmes positions que sur l'écran projeté : 2 colonnes, sur toute la hauteur restante. */
+  /* 2 colonnes, sur toute la hauteur restante. */
   .answers {
     display: grid;
     flex: 1;

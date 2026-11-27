@@ -1,5 +1,5 @@
 import type { PlayerId, ServerMessage, Stage, TeamId } from "@quorum/protocol";
-import { captainOf, distribution, podium, pointsFor, questionAt, rankOf, shownQuestion, top } from "./rules.ts";
+import { captainOf, distribution, podium, pointsFor, questionAt, rankOf, shownQuestion, teamRef, top } from "./rules.ts";
 import type { GameEvent, GameState, Team } from "./state.ts";
 
 // Un visiteur a saisi le PIN sans avoir encore rejoint la partie : il ne suit que les équipes, pour choisir la sienne.
@@ -8,16 +8,14 @@ export type Recipient = { role: "host" } | { role: "player"; playerId: PlayerId;
 export function project(event: GameEvent, to: Recipient): ServerMessage | null {
   switch (event.type) {
     case "player_joined":
-      return to.role === "player" ? null : event;
     case "answer_count":
       return to.role === "host" ? event : null;
+    case "team_created":
+      return to.role === "visitor" ? event : null;
     case "player_left":
       if (to.role === "host") return event;
       return to.role === "player" && to.playerId === event.playerId ? { type: "error", code: "kicked" } : null;
-    case "captain_changed": {
-      const { teamId, ...message } = event;
-      return to.role === "player" && to.teamId === teamId ? message : null;
-    }
+    case "captain_changed":
     case "team_answer_locked": {
       const { teamId, ...message } = event;
       return to.role === "player" && to.teamId === teamId ? message : null;
@@ -64,10 +62,6 @@ export function snapshot(state: GameState, to: Recipient): ServerMessage {
       return { type: "snapshot", seq, view: { ...view, stage: stage(state, team) } };
     }
   }
-}
-
-function teamRef({ teamId, name }: Team) {
-  return { teamId, name };
 }
 
 // `team` est l'équipe du joueur destinataire, absente pour l'animateur.

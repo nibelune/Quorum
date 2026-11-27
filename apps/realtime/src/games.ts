@@ -22,11 +22,8 @@ export interface Deps {
   leaseMs: number;
 }
 
-// Un visiteur a trouvé la partie par son PIN (`lookup`) et suit ses équipes en attendant de la rejoindre.
-export type Identity =
-  | { role: "host"; gameId: GameId }
-  | { role: "player"; gameId: GameId; playerId: PlayerId; teamId: TeamId }
-  | { role: "visitor"; gameId: GameId };
+// Le destinataire d'une connexion, et la partie qu'elle suit. Un visiteur a trouvé la partie par son PIN (`lookup`).
+export type Identity = Recipient & { gameId: GameId };
 
 export interface Client {
   id: string;
@@ -97,10 +94,6 @@ export function parseJson(text: string | undefined): unknown {
 
 export function send(client: Client, message: ServerMessage): void {
   if (client.socket.readyState === WebSocket.OPEN) client.socket.send(JSON.stringify(message));
-}
-
-export function recipientOf(identity: Identity): Recipient {
-  return identity.role === "player" ? { role: "player", playerId: identity.playerId, teamId: identity.teamId } : { role: identity.role };
 }
 
 export async function addCommand(deps: Deps, gameId: GameId, command: Command, replyTo?: Client): Promise<void> {
