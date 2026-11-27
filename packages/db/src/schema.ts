@@ -81,7 +81,8 @@ export const gameAnswers = pgTable(
       .references(() => games.id, { onDelete: "cascade" }),
     questionId: uuid().notNull(),
     teamId: uuid().notNull(),
-    choiceIndex: integer().notNull(),
+    // Absent pour une remise dans l'ordre : ses points disent si l'ordre était juste.
+    choiceIndex: integer(),
     responseMs: integer().notNull(),
     points: integer().notNull(),
   },

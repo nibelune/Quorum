@@ -47,9 +47,24 @@ export const MultipleChoiceQuestion = z
   .refine((question) => question.correctIndex < question.choices.length);
 export const PollQuestion = z.object({ kind: z.literal("poll"), ...common, choices: Choices });
 
-export const QuestionKind = z.enum(["choice", "poll"]);
+// Une suite de positions dans `choices`, du premier élément au dernier.
+export const Order = z.array(ChoiceIndex).min(3).max(MAX_CHOICES);
+const isOrderOf = (order: number[], choices: string[]) =>
+  order.length === choices.length && choices.every((_, index) => order.includes(index));
+
+// Une remise dans l'ordre : `correctOrder` est l'ordre attendu. L'auteur saisit les éléments dans cet ordre,
+// et chaque partie les mélange.
+export const OrderQuestion = z
+  .object({ kind: z.literal("order"), ...common, choices: Choices.min(3), correctOrder: Order })
+  .refine((question) => isOrderOf(question.correctOrder, question.choices));
+
+export const QuestionKind = z.enum(["choice", "poll", "order"]);
 export type QuestionKind = z.infer<typeof QuestionKind>;
 
 const withId = { id: QuestionId };
-export const Question = z.discriminatedUnion("kind", [MultipleChoiceQuestion.safeExtend(withId), PollQuestion.safeExtend(withId)]);
+export const Question = z.discriminatedUnion("kind", [
+  MultipleChoiceQuestion.safeExtend(withId),
+  PollQuestion.safeExtend(withId),
+  OrderQuestion.safeExtend(withId),
+]);
 export type Question = z.infer<typeof Question>;

@@ -24,10 +24,9 @@ export async function persistGame({ db, redis, logger }: Deps, gameId: GameId, e
   const answers = rounds.flatMap((round) => {
     const event = GameEvent.parse(JSON.parse(round));
     if (event.type !== "question_ended") return [];
+    // Une équipe qui n'a pas répondu n'a pas de temps de réponse.
     return Object.entries(event.results).flatMap(([teamId, { points, choiceIndex, responseMs }]) =>
-      choiceIndex === undefined || responseMs === undefined
-        ? []
-        : [{ gameId, questionId: event.questionId, teamId, choiceIndex, responseMs, points }],
+      responseMs === undefined ? [] : [{ gameId, questionId: event.questionId, teamId, choiceIndex: choiceIndex ?? null, responseMs, points }],
     );
   });
 

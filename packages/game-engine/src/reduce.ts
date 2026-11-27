@@ -2,6 +2,7 @@ import type { ErrorCode, TeamId } from "@quorum/protocol";
 import {
   captainOf,
   correctIndexOf,
+  correctOrderOf,
   deadlineOf,
   distribution,
   GRACE_MS,
@@ -31,6 +32,7 @@ export function reduce(state: GameState, command: Command): ReduceResult {
       if (state.players.length === 0) return rejected("no_players");
       return startQuestion(state, 0, command.at);
     case "answer":
+    case "order":
       return answer(state, command);
     case "tick": {
       if (current.phase !== "question") return withoutEvent(state);
@@ -96,7 +98,7 @@ function isTaken(names: string[], name: string): boolean {
   return names.some((existing) => existing.toLocaleLowerCase() === lowered);
 }
 
-function answer(state: GameState, command: Extract<Command, { type: "answer" }>): ReduceResult {
+function answer(state: GameState, command: Extract<Command, { type: "answer" | "order" }>): ReduceResult {
   const { current } = state;
   const player = state.players.find(({ playerId }) => playerId === command.playerId);
   if (!player) return rejected("kicked");
@@ -105,18 +107,23 @@ function answer(state: GameState, command: Extract<Command, { type: "answer" }>)
   if (question.id !== command.questionId || command.at > deadlineOf(question, current.startedAt) + GRACE_MS) {
     return rejected("too_late");
   }
-  if (command.choiceIndex >= question.choices.length) return rejected("invalid_message");
+  // Une remise dans l'ordre attend un ordre de tous ses éléments, les autres questions un choix.
+  const valid =
+    command.type === "order"
+      ? question.kind === "order" && command.order.length === question.choices.length && new Set(command.order).size === command.order.length
+      : question.kind !== "order" && command.choiceIndex < question.choices.length;
+  if (!valid) return rejected("invalid_message");
   const { playerId, teamId } = player;
   if (captainOf(state, teamId)?.playerId !== playerId) return rejected("not_captain");
   if (current.answers.some((answer) => answer.teamId === teamId)) return rejected("already_answered");
 
-  const { choiceIndex } = command;
-  const round = { ...current, answers: [...current.answers, { playerId, teamId, choiceIndex, at: command.at }] };
+  const given = command.type === "order" ? { order: command.order } : { choiceIndex: command.choiceIndex };
+  const round = { ...current, answers: [...current.answers, { playerId, teamId, ...given, at: command.at }] };
   const answered = { ...state, current: round };
   if (round.answers.length === state.teams.length) return endQuestion(answered, round);
   // Les coéquipiers voient aussitôt le choix de leur capitaine. Une équipe d'un membre, comme en solo, n'a personne à prévenir.
   const hasTeammates = state.players.filter((member) => member.teamId === teamId).length > 1;
-  return hasTeammates ? emit(answered, { type: "team_answer_locked", teamId, choiceIndex }) : withoutEvent(answered);
+  return hasTeammates ? emit(answered, { type: "team_answer_locked", teamId, ...given }) : withoutEvent(answered);
 }
 
 function kick(state: GameState, command: Extract<Command, { type: "kick" }>): ReduceResult {
@@ -180,7 +187,11 @@ function endQuestion(state: GameState, round: QuestionRound): ReduceResult {
   const scored = state.teams.map((team) => {
     const answer = round.answers.find(({ teamId }) => teamId === team.teamId);
     const points = pointsFor(question, round.startedAt, answer);
-    const given = answer && { choiceIndex: answer.choiceIndex, responseMs: Math.max(answer.at - round.startedAt, 0) };
+    const given = answer && {
+      choiceIndex: answer.choiceIndex,
+      order: answer.order,
+      responseMs: Math.max(answer.at - round.startedAt, 0),
+    };
     return { team: { ...team, score: team.score + points }, points, given };
   });
   return emit(
@@ -193,6 +204,7 @@ function endQuestion(state: GameState, round: QuestionRound): ReduceResult {
       type: "question_ended",
       questionId: question.id,
       correctIndex: correctIndexOf(question),
+      correctOrder: correctOrderOf(question),
       distribution: distribution(question, round.answers),
       results: Object.fromEntries(scored.map(({ team, points, given }) => [team.teamId, { points, score: team.score, ...given }])),
     },

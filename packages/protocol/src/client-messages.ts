@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { ChoiceIndex, Nickname, Pin, PlayerId, QuestionId, TeamId, TeamName } from "./domain.ts";
+import { ChoiceIndex, Nickname, Order, Pin, PlayerId, QuestionId, TeamId, TeamName } from "./domain.ts";
 
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 // En mode équipes, le joueur crée une équipe ou en rejoint une existante.
 export const TeamChoice = z.union([z.object({ create: TeamName }), z.object({ join: TeamId })]);
@@ -23,6 +23,8 @@ export const ClientMessage = z.discriminatedUnion("type", [
   // Rejoint la partie trouvée par `lookup`.
   z.object({ type: z.literal("join"), nickname: Nickname, team: TeamChoice.optional() }),
   z.object({ type: z.literal("answer"), questionId: QuestionId, choiceIndex: ChoiceIndex }),
+  // Réponse à une remise dans l'ordre.
+  z.object({ type: z.literal("order"), questionId: QuestionId, order: Order }),
   z.object({ type: z.literal("start") }),
   z.object({ type: z.literal("next") }),
   z.object({ type: z.literal("kick"), playerId: PlayerId }),

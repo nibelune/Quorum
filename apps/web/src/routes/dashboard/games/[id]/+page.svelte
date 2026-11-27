@@ -55,7 +55,7 @@
             <th scope="row">{team.name}</th>
             {#if teams}<td>{team.members.join(", ")}</td>{/if}
             <td>{team.score}</td>
-            <td>{team.correctCount} / {game.questions.filter(({ kind }) => kind === "choice").length}</td>
+            <td>{team.correctCount} / {game.questions.filter(({ kind }) => kind !== "poll").length}</td>
             <td>{seconds(team.averageResponseMs)}</td>
           </tr>
         {/each}
@@ -66,20 +66,25 @@
   <section>
     <h2>Questions</h2>
     {#each game.questions as question, number (question.id)}
-      {@const answered = question.distribution.reduce((total, count) => total + count, 0)}
-      <!-- Un sondage n'a pas de bonne réponse. -->
+      {@const { answerCount, correctCount } = question}
       {@const correctIndex = question.kind === "choice" ? question.correctIndex : undefined}
-      {@const correct = correctIndex === undefined ? 0 : (question.distribution[correctIndex] ?? 0)}
       <article>
         <h3>{number + 1}. {question.text}</h3>
         <p class="meta">
-          {#if correctIndex === undefined}
-            Sondage : {answered} réponse{answered > 1 ? "s" : ""}
+          {#if question.kind === "poll"}
+            Sondage : {answerCount} réponse{answerCount > 1 ? "s" : ""}
           {:else}
-            Bonnes réponses : {correct} / {answered} ({share(correct, answered)} %)
+            Bonnes réponses : {correctCount} / {answerCount} ({share(correctCount, answerCount)} %)
           {/if}
           · temps moyen {seconds(question.averageResponseMs)}
         </p>
+        {#if question.kind === "order"}
+          <ol class="order">
+            {#each question.correctOrder as index (index)}
+              <li>{question.choices[index]}</li>
+            {/each}
+          </ol>
+        {:else}
         <!-- Formes et couleurs : celles de l'écran projeté, dans l'ordre où les choix y étaient. -->
         <ul class="choices">
           {#each question.choices as choice, index (index)}
@@ -87,11 +92,12 @@
             <li class={{ correct: index === correctIndex }}>
               <ChoiceShape {index} />
               <span>{choice}{#if index === correctIndex}&nbsp;<strong>(bonne réponse)</strong>{/if}</span>
-              <span class="track"><span style:width="{share(count, answered)}%"></span></span>
+              <span class="track"><span style:width="{share(count, answerCount)}%"></span></span>
               <span class="count">{count}</span>
             </li>
           {/each}
         </ul>
+        {/if}
       </article>
     {/each}
   </section>
@@ -175,6 +181,11 @@
 
   .correct .track span {
     background: var(--success);
+  }
+
+  .order {
+    margin: 0;
+    padding-left: 1.5rem;
   }
 
   .count {

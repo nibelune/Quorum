@@ -69,6 +69,14 @@
     join({ create: teamName });
   }
 
+  // Le rangement en cours d'une remise dans l'ordre, propre à sa question : il repart de zéro à la suivante.
+  let ranking: { questionId: string; order: number[] } = $state({ questionId: "", order: [] });
+  const ranked = $derived(view?.stage.phase === "question" && view.stage.question.questionId === ranking.questionId ? ranking.order : []);
+
+  function rank(questionId: string, index: number) {
+    ranking = { questionId, order: [...ranked, index] };
+  }
+
   function answer(choiceIndex: number) {
     const stage = view?.stage;
     if (stage?.phase === "question") game?.send({ type: "answer", questionId: stage.question.questionId, choiceIndex });
@@ -105,22 +113,65 @@
       {@const choices = playerChoices(stage.question.choices, `${stage.question.questionId}:${view.nickname}`)}
       {#if !captain}
         <p class="text">{stage.question.text}</p>
-        <ul class="answers">
-          {#each choices as { index, text }, position (index)}
-            {@const picked = stage.teamAnswer === index}
-            <li style:--color="var(--choice-{position})" class={{ picked, faded: stage.teamAnswer !== undefined && !picked }}>
-              <ChoiceShape index={position} size="2.5rem" />
-              <span>{text}</span>
-              {#if picked}<strong class="pick">Choix de l'équipe</strong>{/if}
-            </li>
-          {/each}
-        </ul>
+        {#if stage.teamOrder}
+          <!-- L'ordre choisi par le capitaine. -->
+          <ol class="team-order">
+            {#each stage.teamOrder as index, position (index)}
+              <li><strong>{position + 1}</strong> {stage.question.choices[index]}</li>
+            {/each}
+          </ol>
+        {:else}
+          <ul class="answers">
+            {#each choices as { index, text }, position (index)}
+              {@const picked = stage.teamAnswer === index}
+              <li style:--color="var(--choice-{position})" class={{ picked, faded: stage.teamAnswer !== undefined && !picked }}>
+                <ChoiceShape index={position} size="2.5rem" />
+                <span>{text}</span>
+                {#if picked}<strong class="pick">Choix de l'équipe</strong>{/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
         <p class="score">
           {view.team.captain}
-          {stage.teamAnswer === undefined ? "répond pour l'équipe : discutez-en !" : "a répondu pour l'équipe."}
+          {stage.answered ? "a répondu pour l'équipe." : "répond pour l'équipe : discutez-en !"}
         </p>
       {:else if stage.answered}
         <p class="screen">Réponse envoyée ! Attends les autres…</p>
+      {:else if stage.question.kind === "order"}
+        {@const questionId = stage.question.questionId}
+        <p class="text">{stage.question.text}</p>
+        <p class="score">Touche les éléments dans l'ordre, puis valide.</p>
+        <div class="answers">
+          {#each choices as { index, text }, position (index)}
+            {@const placed = ranked.indexOf(index)}
+            <button
+              style:--color="var(--choice-{position})"
+              disabled={game?.status !== "open" || placed >= 0}
+              onclick={() => {
+                rank(questionId, index);
+              }}
+            >
+              {#if placed >= 0}<strong class="placed">{placed + 1}</strong>{:else}<ChoiceShape index={position} size="2.5rem" />{/if}
+              <span>{text}</span>
+            </button>
+          {/each}
+        </div>
+        <div class="order-actions">
+          <button
+            disabled={ranked.length === 0}
+            onclick={() => {
+              ranking = { questionId: "", order: [] };
+            }}>Recommencer</button
+          >
+          <button
+            class="primary"
+            disabled={game?.status !== "open" || ranked.length < choices.length}
+            onclick={() => {
+              game?.send({ type: "order", questionId, order: ranked });
+            }}>Valider</button
+          >
+        </div>
       {:else}
         <p class="text">{stage.question.text}</p>
         <div class="answers">
@@ -310,6 +361,39 @@
 
   .pick {
     font-size: 0.9rem;
+  }
+
+  .placed {
+    font-size: 2rem;
+    color: var(--brand);
+  }
+
+  .order-actions {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 0.75rem;
+  }
+
+  .order-actions button {
+    padding-block: 0.9rem;
+  }
+
+  .team-order {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .team-order li {
+    display: flex;
+    gap: 0.75rem;
+    border-radius: var(--radius);
+    padding: 1rem;
+    font-size: 1.1rem;
+    background: var(--surface);
+    box-shadow: var(--shadow);
   }
 
   .teams {

@@ -17,14 +17,37 @@ export function shuffleChoices(question: Question, random: () => number): Questi
   const shuffled: typeof remaining = [];
   while (remaining.length > 0) shuffled.push(...remaining.splice(Math.floor(random() * remaining.length), 1));
   const choices = shuffled.map(({ text }) => text);
-  return question.kind === "choice"
-    ? { ...question, choices, correctIndex: shuffled.findIndex(({ index }) => index === question.correctIndex) }
-    : { ...question, choices };
+  const positionOf = (original: number) => shuffled.findIndex(({ index }) => index === original);
+  switch (question.kind) {
+    case "choice":
+      return { ...question, choices, correctIndex: positionOf(question.correctIndex) };
+    case "order":
+      return { ...question, choices, correctOrder: question.correctOrder.map(positionOf) };
+    case "poll":
+      return { ...question, choices };
+  }
 }
 
 // Un sondage n'a pas de bonne réponse.
 export function correctIndexOf(question: Question): number | undefined {
   return question.kind === "choice" ? question.correctIndex : undefined;
+}
+
+export function correctOrderOf(question: Question): number[] | undefined {
+  return question.kind === "order" ? question.correctOrder : undefined;
+}
+
+function isCorrect(question: Question, answer: Answer): boolean {
+  switch (question.kind) {
+    case "choice":
+      return answer.choiceIndex === question.correctIndex;
+    // Tout ou rien : chaque élément doit être à sa place (ADR 0015).
+    case "order":
+      return answer.order?.join() === question.correctOrder.join();
+    // Un sondage ne rapporte aucun point.
+    case "poll":
+      return false;
+  }
 }
 
 export function deadlineOf(question: Question, startedAt: number): number {
@@ -43,8 +66,7 @@ export function shownQuestion(question: Question, startedAt: number): ShownQuest
 }
 
 export function pointsFor(question: Question, startedAt: number, answer: Answer | undefined): number {
-  // Un sondage ne rapporte aucun point.
-  if (question.kind !== "choice" || answer?.choiceIndex !== question.correctIndex) return 0;
+  if (!answer || !isCorrect(question, answer)) return 0;
   const duration = question.durationSec * 1000;
   // Bornée des deux côtés : la tolérance réseau ne coûte pas de points, et un léger décalage d'horloge entre nœuds n'en donne pas.
   const responseTime = Math.min(Math.max(answer.at - startedAt, 0), duration);

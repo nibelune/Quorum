@@ -5,6 +5,7 @@ import {
   ImageUrl,
   MultipleChoiceQuestion,
   Nickname,
+  OrderQuestion,
   Pin,
   PollQuestion,
   Question,
@@ -21,7 +22,13 @@ const draftId = { id: QuestionId.optional() };
 export const QuizInput = z.object({
   title: Title,
   questions: z
-    .array(z.discriminatedUnion("kind", [MultipleChoiceQuestion.safeExtend(draftId), PollQuestion.safeExtend(draftId)]))
+    .array(
+      z.discriminatedUnion("kind", [
+        MultipleChoiceQuestion.safeExtend(draftId),
+        PollQuestion.safeExtend(draftId),
+        OrderQuestion.safeExtend(draftId),
+      ]),
+    )
     .min(1)
     .max(100),
 });
@@ -51,7 +58,7 @@ const Count = z.int().nonnegative();
 const AverageMs = Count.nullable();
 
 // Les questions telles qu'elles ont été jouées : `distribution` compte les réponses de chaque choix, dans leur ordre.
-const stats = { id: QuestionId, distribution: z.array(Count), averageResponseMs: AverageMs };
+const stats = { id: QuestionId, answerCount: Count, correctCount: Count, distribution: z.array(Count), averageResponseMs: AverageMs };
 
 // Une partie terminée, dans la liste de l'animateur.
 export const GameSummary = z.object({ id: GameId, title: Title, mode: GameMode, endedAt: z.iso.datetime(), playerCount: Count });
@@ -62,7 +69,9 @@ export const GameResults = z.object({
   title: Title,
   mode: GameMode,
   endedAt: z.iso.datetime(),
-  questions: z.array(z.discriminatedUnion("kind", [MultipleChoiceQuestion.safeExtend(stats), PollQuestion.safeExtend(stats)])),
+  questions: z.array(
+    z.discriminatedUnion("kind", [MultipleChoiceQuestion.safeExtend(stats), PollQuestion.safeExtend(stats), OrderQuestion.safeExtend(stats)]),
+  ),
   // De la première à la dernière. En solo, chaque joueur forme une équipe d'un membre, à son nom.
   teams: z.array(
     z.object({

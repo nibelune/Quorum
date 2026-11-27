@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { GRACE_MS, podium, pointsFor, rankOf, shuffleChoices, top } from "./rules.ts";
 import type { Team } from "./state.ts";
-import { alice, capital, favourite, red, T0 } from "./testing.ts";
+import { alice, capital, favourite, planets, red, T0 } from "./testing.ts";
 
 const duration = capital.durationSec * 1000;
 
@@ -13,6 +13,13 @@ test.each([
   ["semble répondre avant le début (décalage d'horloge)", -100, 1000],
 ])("une bonne réponse rapporte les points attendus quand le joueur %s", (_, elapsed, points) => {
   expect(pointsFor(capital, T0, { playerId: alice, teamId: red, choiceIndex: capital.correctIndex, at: T0 + elapsed })).toBe(points);
+});
+
+test.each([
+  ["dans le bon ordre", [0, 1, 2, 3], 1000],
+  ["avec deux éléments inversés", [0, 2, 1, 3], 0],
+])("une remise dans l'ordre rapporte tout ou rien : réponse %s", (_, positions, points) => {
+  expect(pointsFor(planets, T0, { playerId: alice, teamId: red, order: positions, at: T0 })).toBe(points);
 });
 
 test("un sondage ne rapporte aucun point", () => {
@@ -61,6 +68,11 @@ describe("shuffleChoices", () => {
 
   test("garde l'ordre d'origine avec un aléa nul", () => {
     expect(shuffleChoices(capital, () => 0)).toEqual(capital);
+  });
+
+  test("mélange les éléments d'une remise dans l'ordre, et suit l'ordre attendu", () => {
+    const shuffled = shuffleChoices(planets, () => 0.9);
+    expect(shuffled).toMatchObject({ choices: ["Mars", "Terre", "Vénus", "Mercure"], correctOrder: [3, 2, 1, 0] });
   });
 
   test("mélange aussi les choix d'un sondage, qui n'a pas de bonne réponse", () => {

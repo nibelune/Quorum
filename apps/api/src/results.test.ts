@@ -84,8 +84,14 @@ test("donne les résultats d'une partie : classement des équipes et statistique
   ]);
   const capitalDistribution = capital.choices.map((_, index) => (index === capital.correctIndex || index === wrong ? 1 : 0));
   expect(results.questions).toEqual([
-    { ...capital, distribution: capitalDistribution, averageResponseMs: 3000 },
-    { ...flatEarth, distribution: flatEarth.choices.map((_, index) => (index === flatEarth.correctIndex ? 2 : 0)), averageResponseMs: 5000 },
+    { ...capital, answerCount: 2, correctCount: 1, distribution: capitalDistribution, averageResponseMs: 3000 },
+    {
+      ...flatEarth,
+      answerCount: 2,
+      correctCount: 2,
+      distribution: flatEarth.choices.map((_, index) => (index === flatEarth.correctIndex ? 2 : 0)),
+      averageResponseMs: 5000,
+    },
   ]);
 });
 

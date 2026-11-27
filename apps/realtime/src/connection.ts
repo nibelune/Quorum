@@ -134,18 +134,14 @@ async function handleMessage(node: Node, client: Client, data: RawData): Promise
       await addCommand(deps, gameId, command, client);
       return;
     }
-    case "answer": {
+    // Un choix, ou l'ordre d'une remise dans l'ordre : le moteur vérifie qu'il convient à la question.
+    case "answer":
+    case "order": {
       if (identity?.role !== "player") {
         fail(client, "forbidden");
         return;
       }
-      const { questionId, choiceIndex } = message;
-      await addCommand(
-        deps,
-        identity.gameId,
-        { type: "answer", at: now, playerId: identity.playerId, questionId, choiceIndex },
-        client,
-      );
+      await addCommand(deps, identity.gameId, { ...message, at: now, playerId: identity.playerId }, client);
       send(client, { type: "answer_received" });
       return;
     }

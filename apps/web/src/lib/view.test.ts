@@ -102,6 +102,11 @@ describe("joueur", () => {
     expect(stageOf(locked)).toMatchObject({ answered: true, teamAnswer: 1 });
   });
 
+  test("voit l'ordre choisi par son capitaine pour une remise dans l'ordre", () => {
+    const locked = reduceView(at(inQuestion(player)), { type: "team_answer_locked", seq: 2, order: [2, 0, 1] });
+    expect(stageOf(locked)).toMatchObject({ answered: true, teamOrder: [2, 0, 1] });
+  });
+
   test("quand le capitaine est exclu, son successeur prend la main et répond à son tour", () => {
     const locked = reduceView(at(inQuestion(player)), { type: "team_answer_locked", seq: 2, choiceIndex: 1 });
     const changed = reduceView(locked, { type: "captain_changed", seq: 3, captain: "Bob" });

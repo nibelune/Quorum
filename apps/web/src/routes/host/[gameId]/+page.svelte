@@ -118,6 +118,8 @@
         </div>
       </section>
     {:else if stage.phase === "question" || stage.phase === "reveal"}
+      <!-- À la révélation d'une remise dans l'ordre, les éléments prennent leur place, numérotés. -->
+      {@const correctOrder = stage.phase === "reveal" ? stage.correctOrder : undefined}
       <!-- Les deux tiers du haut : l'énoncé, posé sur l'image de la question. Le tiers du bas : les réponses, en 2 × 2. -->
       <section class="question">
         <div class="stage">
@@ -147,7 +149,7 @@
           </footer>
         </div>
         <ul class="choices">
-          {#each stage.question.choices as choice, index (index)}
+          {#each correctOrder ?? stage.question.choices.map((_, index) => index) as index, position (index)}
             <li
               style:--color="var(--choice-{index})"
               class={{
@@ -156,9 +158,9 @@
                 faded: stage.phase === "reveal" && stage.correctIndex !== undefined && index !== stage.correctIndex,
               }}
             >
-              <ChoiceShape {index} size="2.5rem" />
-              <span>{choice}</span>
-              {#if stage.phase === "reveal"}<strong class="votes">{stage.distribution[index] ?? 0}</strong>{/if}
+              {#if correctOrder}<strong>{position + 1}.</strong>{:else}<ChoiceShape {index} size="2.5rem" />{/if}
+              <span>{stage.question.choices[index]}</span>
+              {#if stage.phase === "reveal" && !correctOrder}<strong class="votes">{stage.distribution[index] ?? 0}</strong>{/if}
             </li>
           {/each}
         </ul>

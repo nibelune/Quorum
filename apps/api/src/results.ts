@@ -1,6 +1,6 @@
 import { gameAnswers, gamePlayers, games, gameTeams } from "@quorum/db";
 import { GameId, GameResults, GameSummary } from "@quorum/protocol";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -38,19 +38,24 @@ export function resultRoutes(app: FastifyInstance, { db }: Deps): void {
       // Tant que le worker n'a pas enregistré ses résultats, une partie n'en a pas.
       if (!game?.endedAt) return reply.code(404).send(null);
 
-      const [answers, teams, players] = await Promise.all([
+      const [byQuestion, byChoice, teams, players] = await Promise.all([
+        // Une réponse rapporte des points si et seulement si elle est juste.
         db
           .select({
             questionId: gameAnswers.questionId,
-            choiceIndex: gameAnswers.choiceIndex,
-            count: sql<number>`count(*)::int`,
-            totalMs: sql<number>`sum(${gameAnswers.responseMs})::int`,
+            answerCount: sql<number>`count(*)::int`,
+            correctCount: sql<number>`(count(*) filter (where ${gameAnswers.points} > 0))::int`,
+            averageResponseMs: sql<number>`round(avg(${gameAnswers.responseMs}))::int`,
           })
           .from(gameAnswers)
           .where(eq(gameAnswers.gameId, gameId))
+          .groupBy(gameAnswers.questionId),
+        db
+          .select({ questionId: gameAnswers.questionId, choiceIndex: gameAnswers.choiceIndex, count: sql<number>`count(*)::int` })
+          .from(gameAnswers)
+          .where(and(eq(gameAnswers.gameId, gameId), isNotNull(gameAnswers.choiceIndex)))
           .groupBy(gameAnswers.questionId, gameAnswers.choiceIndex),
-        // Une réponse rapporte des points si et seulement si elle est juste. Le rang suit les règles de la partie :
-        // à score égal, même rang, et l'équipe créée la plus tôt passe devant.
+        // Le rang suit les règles de la partie : à score égal, même rang, et l'équipe créée la plus tôt passe devant.
         db
           .select({
             teamId: gameTeams.teamId,
@@ -78,13 +83,15 @@ export function resultRoutes(app: FastifyInstance, { db }: Deps): void {
         mode: game.mode,
         endedAt: game.endedAt.toISOString(),
         questions: game.questions.map((question) => {
-          const rows = answers.filter(({ questionId }) => questionId === question.id);
-          const answered = rows.reduce((total, { count }) => total + count, 0);
-          const totalMs = rows.reduce((total, row) => total + row.totalMs, 0);
+          const totals = byQuestion.find(({ questionId }) => questionId === question.id);
+          const count = (index: number) =>
+            byChoice.find((row) => row.questionId === question.id && row.choiceIndex === index)?.count ?? 0;
           return {
             ...question,
-            distribution: question.choices.map((_, index) => rows.find(({ choiceIndex }) => choiceIndex === index)?.count ?? 0),
-            averageResponseMs: answered === 0 ? null : Math.round(totalMs / answered),
+            answerCount: totals?.answerCount ?? 0,
+            correctCount: totals?.correctCount ?? 0,
+            distribution: question.choices.map((_, index) => count(index)),
+            averageResponseMs: totals?.averageResponseMs ?? null,
           };
         }),
         teams: teams.map(({ teamId, ...team }) => ({

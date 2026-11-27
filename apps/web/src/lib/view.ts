@@ -49,12 +49,12 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
     case "captain_changed": {
       if (view.role !== "player") return state;
       // La réponse du capitaine exclu est partie avec lui : son successeur répond à son tour.
-      const next = stage.phase === "question" ? { ...stage, answered: false, teamAnswer: undefined } : stage;
+      const next = stage.phase === "question" ? { ...stage, answered: false, teamAnswer: undefined, teamOrder: undefined } : stage;
       return { seq, view: { ...view, team: { ...view.team, captain: message.captain }, stage: next } };
     }
     case "team_answer_locked":
       if (stage.phase !== "question") return { seq, view };
-      return { seq, view: { ...view, stage: { ...stage, answered: true, teamAnswer: message.choiceIndex } } };
+      return { seq, view: { ...view, stage: { ...stage, answered: true, teamAnswer: message.choiceIndex, teamOrder: message.order } } };
     case "question_started": {
       const { questionId, kind, text, choices, imageUrl, deadline } = message;
       const question = { questionId, kind, text, choices, imageUrl, deadline };
@@ -74,8 +74,9 @@ export function reduceView(state: ViewState, message: ServerMessage): ViewState 
       return { seq, view: { ...view, stage: { ...stage, answered: true } } };
     case "question_ended": {
       if (stage.phase !== "question") return { seq, view };
-      const { correctIndex, distribution, you } = message;
-      return { seq, view: { ...view, stage: { phase: "reveal", question: stage.question, correctIndex, distribution, you } } };
+      const { correctIndex, correctOrder, distribution, you } = message;
+      const reveal: Stage = { phase: "reveal", question: stage.question, correctIndex, correctOrder, distribution, you };
+      return { seq, view: { ...view, stage: reveal } };
     }
     case "leaderboard":
       return { seq, view: { ...view, stage: { phase: "leaderboard", top: message.top, you: message.you } } };

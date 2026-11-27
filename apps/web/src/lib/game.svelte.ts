@@ -47,7 +47,7 @@ export class GameConnection {
   send(message: ClientMessage): void {
     this.error = null;
     const text = JSON.stringify(message);
-    if (message.type === "answer") this.#pendingAnswer = text;
+    if (message.type === "answer" || message.type === "order") this.#pendingAnswer = text;
     if (this.#socket.readyState === WebSocket.OPEN) this.#socket.send(text);
   }
 

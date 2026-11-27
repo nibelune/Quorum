@@ -16,6 +16,9 @@
   const trueFalse = (): DraftQuestion => ({ kind: "choice", text: "", choices: ["Vrai", "Faux"], correctIndex: 0, durationSec: 20 });
   // Un sondage n'a pas de bonne réponse et ne rapporte aucun point.
   const poll = (): DraftQuestion => ({ kind: "poll", text: "", choices: ["", "", "", ""], durationSec: 20 });
+  // Les éléments d'une remise dans l'ordre sont saisis dans l'ordre attendu (ADR 0015).
+  const order = (): DraftQuestion => ({ kind: "order", text: "", choices: ["", "", ""], correctOrder: [0, 1, 2], durationSec: 30 });
+  const KIND_LABELS = { choice: "", poll: " (sondage)", order: " (remise dans l'ordre)" };
 
   let draft: QuizInput | null = $state(null);
   let error = $state("");
@@ -35,11 +38,24 @@
     draft?.questions.splice(index, 1);
   }
 
+  function addChoice(question: DraftQuestion) {
+    question.choices.push("");
+    if (question.kind === "order") question.correctOrder = question.choices.map((_, index) => index);
+  }
+
   function removeChoice(question: DraftQuestion, index: number) {
     question.choices.splice(index, 1);
-    if (question.kind !== "choice") return;
-    if (index < question.correctIndex) question.correctIndex--;
-    else if (index === question.correctIndex) question.correctIndex = 0;
+    switch (question.kind) {
+      case "choice":
+        if (index < question.correctIndex) question.correctIndex--;
+        else if (index === question.correctIndex) question.correctIndex = 0;
+        return;
+      case "order":
+        question.correctOrder = question.choices.map((_, position) => position);
+        return;
+      case "poll":
+        return;
+    }
   }
 
   async function upload(question: DraftQuestion, input: HTMLInputElement) {
@@ -87,7 +103,7 @@
 
     {#each draft.questions as question, q (question)}
       <fieldset>
-        <legend>Question {q + 1}{question.kind === "poll" ? " (sondage)" : ""}</legend>
+        <legend>Question {q + 1}{KIND_LABELS[question.kind]}</legend>
         <label>Énoncé <textarea bind:value={question.text} required maxlength="300" rows="2"></textarea></label>
 
         <div class="image">
@@ -113,18 +129,26 @@
           {/if}
         </div>
 
+        {#if question.kind === "order"}
+          <p class="hint">Saisissez les éléments dans le bon ordre : chaque joueur les verra mélangés.</p>
+        {/if}
         <ol>
           {#each question.choices, c}
             <li>
-              <ChoiceShape index={c} />
-              <input bind:value={question.choices[c]} aria-label="Choix {c + 1}" required maxlength="120" />
+              {#if question.kind === "order"}
+                <span class="rank">{c + 1}</span>
+                <input bind:value={question.choices[c]} aria-label="Élément {c + 1}" required maxlength="120" />
+              {:else}
+                <ChoiceShape index={c} />
+                <input bind:value={question.choices[c]} aria-label="Choix {c + 1}" required maxlength="120" />
+              {/if}
               {#if question.kind === "choice"}
                 <label class="correct">
                   <input type="radio" name="correct-{q}" value={c} bind:group={question.correctIndex} />
                   Bonne réponse
                 </label>
               {/if}
-              {#if question.choices.length > 2}
+              {#if question.choices.length > (question.kind === "order" ? 3 : 2)}
                 <button type="button" onclick={() => {
                     removeChoice(question, c);
                   }} aria-label="Retirer le choix {c + 1}">✕</button>
@@ -135,7 +159,12 @@
 
         <div class="row">
           {#if question.choices.length < MAX_CHOICES}
-            <button type="button" onclick={() => question.choices.push("")}>Ajouter un choix</button>
+            <button
+              type="button"
+              onclick={() => {
+                addChoice(question);
+              }}>{question.kind === "order" ? "Ajouter un élément" : "Ajouter un choix"}</button
+            >
           {/if}
           <label class="duration">
             Durée
@@ -164,6 +193,9 @@
       <button type="button" onclick={() => {
           addQuestion(poll());
         }}>Ajouter un sondage</button>
+      <button type="button" onclick={() => {
+          addQuestion(order());
+        }}>Ajouter une remise dans l'ordre</button>
     </div>
 
     {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -221,6 +253,18 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
+  }
+
+  .hint {
+    margin: 0;
+    color: var(--ink-muted);
+  }
+
+  .rank {
+    width: 1.5rem;
+    font-weight: 800;
+    text-align: center;
+    color: var(--brand);
   }
 
   .correct {

@@ -1,5 +1,5 @@
 import type { PlayerId, ServerMessage, Stage, TeamId } from "@quorum/protocol";
-import { captainOf, correctIndexOf, distribution, podium, pointsFor, questionAt, rankOf, shownQuestion, teamRef, top } from "./rules.ts";
+import { captainOf, correctIndexOf, correctOrderOf, distribution, podium, pointsFor, questionAt, rankOf, shownQuestion, teamRef, top } from "./rules.ts";
 import type { GameEvent, GameState, Team } from "./state.ts";
 
 // Un visiteur a saisi le PIN sans avoir encore rejoint la partie : il ne suit que les équipes, pour choisir la sienne.
@@ -77,7 +77,7 @@ function stage(state: GameState, team?: Team): Stage {
       const question = shownQuestion(questionAt(state, current.index), current.startedAt);
       if (!team) return { phase: "question", question, answerCount: current.answers.length };
       const answer = current.answers.find(({ teamId }) => teamId === team.teamId);
-      return { phase: "question", question, answered: answer !== undefined, teamAnswer: answer?.choiceIndex };
+      return { phase: "question", question, answered: answer !== undefined, teamAnswer: answer?.choiceIndex, teamOrder: answer?.order };
     }
     case "reveal": {
       const question = questionAt(state, current.index);
@@ -86,6 +86,7 @@ function stage(state: GameState, team?: Team): Stage {
         phase: "reveal",
         question: shownQuestion(question, current.startedAt),
         correctIndex: correctIndexOf(question),
+        correctOrder: correctOrderOf(question),
         distribution: distribution(question, current.answers),
         you: team && { points: pointsFor(question, current.startedAt, answer), score: team.score },
       };

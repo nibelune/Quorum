@@ -2,6 +2,7 @@ import {
   ChoiceIndex,
   GameMode,
   Nickname,
+  Order,
   Pin,
   PlayerId,
   Question,
@@ -19,7 +20,8 @@ const Timestamp = z.int();
 const Count = z.int().nonnegative();
 const Score = z.int().nonnegative();
 
-const Answer = z.object({ playerId: PlayerId, teamId: TeamId, choiceIndex: ChoiceIndex, at: Timestamp });
+// Le choix d'un QCM ou d'un sondage, ou l'ordre d'une remise dans l'ordre.
+const Answer = z.object({ playerId: PlayerId, teamId: TeamId, choiceIndex: ChoiceIndex.optional(), order: Order.optional(), at: Timestamp });
 export type Answer = z.infer<typeof Answer>;
 
 const RoundFields = { index: Count, startedAt: Timestamp, answers: z.array(Answer) };
@@ -63,6 +65,7 @@ export const Command = z.discriminatedUnion("type", [
     questionId: QuestionId,
     choiceIndex: ChoiceIndex,
   }),
+  z.object({ type: z.literal("order"), at: Timestamp, playerId: PlayerId, questionId: QuestionId, order: Order }),
   z.object({ type: z.literal("kick"), at: Timestamp, playerId: PlayerId }),
   z.object({ type: z.literal("start"), at: Timestamp }),
   z.object({ type: z.literal("next"), at: Timestamp }),
@@ -79,7 +82,7 @@ export const GameEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("player_left"), seq: Seq, playerId: PlayerId }),
   z.object({ type: z.literal("team_created"), seq: Seq, team: TeamRef }),
   z.object({ type: z.literal("captain_changed"), seq: Seq, teamId: TeamId, captain: Nickname }),
-  z.object({ type: z.literal("team_answer_locked"), seq: Seq, teamId: TeamId, choiceIndex: ChoiceIndex }),
+  z.object({ type: z.literal("team_answer_locked"), seq: Seq, teamId: TeamId, choiceIndex: ChoiceIndex.optional(), order: Order.optional() }),
   z.object({ type: z.literal("question_started"), seq: Seq, ...ShownQuestion.shape }),
   z.object({ type: z.literal("answer_count"), seq: Seq, count: Count }),
   // Le choix et le temps de réponse de chaque équipe servent aux statistiques : chaque fin de question est archivée (ADR 0014).
@@ -87,12 +90,19 @@ export const GameEvent = z.discriminatedUnion("type", [
     type: z.literal("question_ended"),
     seq: Seq,
     questionId: QuestionId,
-    // Absente pour un sondage.
+    // La bonne réponse d'un QCM, ou l'ordre attendu d'une remise dans l'ordre.
     correctIndex: ChoiceIndex.optional(),
+    correctOrder: Order.optional(),
     distribution: z.array(Count),
     results: z.record(
       TeamId,
-      z.object({ points: Score, score: Score, choiceIndex: ChoiceIndex.optional(), responseMs: Count.optional() }),
+      z.object({
+        points: Score,
+        score: Score,
+        choiceIndex: ChoiceIndex.optional(),
+        order: Order.optional(),
+        responseMs: Count.optional(),
+      }),
     ),
   }),
   z.object({

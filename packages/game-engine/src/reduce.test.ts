@@ -24,6 +24,10 @@ import {
   soloTeam,
   T0,
   favourite,
+  order,
+  planets,
+  playOrder,
+  playOrderInTeams,
   playPoll,
 } from "./testing.ts";
 
@@ -328,5 +332,44 @@ test("un sondage compte les votes, sans bonne réponse ni points", () => {
       [soloTeam(alice)]: { points: 0, score: 0, choiceIndex: 2, responseMs: 0 },
       [soloTeam(bob)]: { points: 0, score: 0, choiceIndex: 2, responseMs: 0 },
     },
+  });
+});
+
+describe("remise dans l'ordre", () => {
+  const started = [join(alice, "Alice"), join(bob, "Bob"), host("start")];
+
+  test("donne les points à l'ordre exact, rien sinon, et révèle l'ordre attendu", () => {
+    const { events } = playOrder(...started, order(alice, [0, 1, 2, 3], T0 + 15_000), order(bob, [1, 0, 2, 3]));
+    expect(events.at(-1)).toMatchObject({
+      type: "question_ended",
+      correctOrder: [0, 1, 2, 3],
+      results: {
+        [soloTeam(alice)]: { points: 750, order: [0, 1, 2, 3], responseMs: 15_000 },
+        [soloTeam(bob)]: { points: 0, order: [1, 0, 2, 3] },
+      },
+    });
+  });
+
+  test.each([
+    ["un choix à la place d'un ordre", answer(alice, 0, T0, planets.id)],
+    ["un ordre incomplet", order(alice, [0, 1, 2])],
+    ["un élément placé deux fois", order(alice, [0, 0, 1, 2])],
+  ])("refuse %s", (_, command) => {
+    expect(reduce(playOrder(...started).state, command)).toEqual({ ok: false, error: "invalid_message" });
+  });
+
+  test("refuse un ordre en réponse à un QCM", () => {
+    const ordered: Command = { type: "order", at: T0, playerId: alice, questionId: capital.id, order: [2, 1, 0] };
+    expect(reduce(play(join(alice, "Alice"), host("start")).state, ordered)).toMatchObject({ error: "invalid_message" });
+  });
+
+  test("annonce aux coéquipiers l'ordre choisi par leur capitaine", () => {
+    const lobby = [createTeam(alice, "Alice", red, "Rouges"), joinTeam(bob, "Bob", red), createTeam(carol, "Carol", blue, "Bleus")];
+    expect(playOrderInTeams(...lobby, host("start"), order(alice, [3, 2, 1, 0])).events.at(-1)).toEqual({
+      type: "team_answer_locked",
+      seq: 7,
+      teamId: red,
+      order: [3, 2, 1, 0],
+    });
   });
 });

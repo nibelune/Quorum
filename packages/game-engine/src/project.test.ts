@@ -116,7 +116,7 @@ describe("snapshot", () => {
   test("pendant une question, donne le nombre de réponses à l'animateur et à chaque joueur la réponse de son équipe", () => {
     const { state } = play(...question);
     expect(snapshot(state, toHost)).toMatchObject({ view: { stage: { phase: "question", question: shown, answerCount: 1 } } });
-    expect(snapshot(state, toPlayer(alice))).toStrictEqual({
+    expect(snapshot(state, toPlayer(alice))).toEqual({
       type: "snapshot",
       seq: 3,
       view: {

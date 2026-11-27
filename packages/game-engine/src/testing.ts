@@ -1,4 +1,4 @@
-import { type GameMode, MultipleChoiceQuestion, PlayerId, Question, QuestionId, type TeamChoice, TeamId } from "@quorum/protocol";
+import { type GameMode, MultipleChoiceQuestion, OrderQuestion, PlayerId, Question, QuestionId, type TeamChoice, TeamId } from "@quorum/protocol";
 import { reduce } from "./reduce.ts";
 import { type Command, createGame, type GameEvent, type GameState } from "./state.ts";
 
@@ -31,6 +31,16 @@ export const favourite = Question.parse({
   text: "Quelle planète préférez-vous ?",
   choices: ["Mars", "Jupiter", "Saturne"],
   durationSec: 20,
+});
+
+// Saisie dans l'ordre attendu : du plus proche du Soleil au plus lointain.
+export const planets = OrderQuestion.safeExtend({ id: QuestionId }).parse({
+  kind: "order",
+  id: crypto.randomUUID(),
+  text: "Rangez ces planètes de la plus proche à la plus lointaine du Soleil.",
+  choices: ["Mercure", "Vénus", "Terre", "Mars"],
+  correctOrder: [0, 1, 2, 3],
+  durationSec: 30,
 });
 
 export const alice = PlayerId.parse(crypto.randomUUID());
@@ -70,6 +80,14 @@ export const answer = (playerId: PlayerId, choiceIndex: number, at = T0, questio
   choiceIndex,
 });
 
+export const order = (playerId: PlayerId, positions: number[], at = T0): Command => ({
+  type: "order",
+  at,
+  playerId,
+  questionId: planets.id,
+  order: positions,
+});
+
 export const kick = (playerId: PlayerId): Command => ({ type: "kick", at: T0, playerId });
 
 export const host = (type: "start" | "next" | "end" | "tick", at = T0): Command => ({ type, at });
@@ -83,8 +101,10 @@ export const play = (...commands: Command[]): Game => replay("solo", commands);
 
 export const playTeams = (...commands: Command[]): Game => replay("teams", commands);
 
-// Une partie en solo d'une seule question : un sondage.
+// Des parties d'une seule question : un sondage, en solo ; une remise dans l'ordre, en solo ou en équipes.
 export const playPoll = (...commands: Command[]): Game => replay("solo", commands, [favourite]);
+export const playOrder = (...commands: Command[]): Game => replay("solo", commands, [planets]);
+export const playOrderInTeams = (...commands: Command[]): Game => replay("teams", commands, [planets]);
 
 function replay(mode: GameMode, commands: Command[], questions: Question[] = [capital, flatEarth]): Game {
   let state = createGame("123456", questions, mode, () => 0);

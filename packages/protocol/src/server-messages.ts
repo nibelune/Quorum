@@ -1,5 +1,19 @@
 import { z } from "zod";
-import { ChoiceIndex, Choices, GameMode, ImageUrl, Nickname, Pin, PlayerId, QuestionId, QuestionKind, QuestionText, TeamId, TeamName } from "./domain.ts";
+import {
+  ChoiceIndex,
+  Choices,
+  GameMode,
+  ImageUrl,
+  Nickname,
+  Order,
+  Pin,
+  PlayerId,
+  QuestionId,
+  QuestionKind,
+  QuestionText,
+  TeamId,
+  TeamName,
+} from "./domain.ts";
 
 const Seq = z.int().nonnegative();
 const Count = z.int().nonnegative();
@@ -24,8 +38,9 @@ export type ShownQuestion = z.infer<typeof ShownQuestion>;
 
 // Les champs optionnels ne concernent qu'un rôle : `answerCount` l'animateur, `answered`, `teamAnswer` et `you` le joueur.
 const Reveal = {
-  // Absente pour un sondage, qui n'a pas de bonne réponse.
+  // La bonne réponse d'un QCM, ou l'ordre attendu d'une remise dans l'ordre. Un sondage n'en a pas.
   correctIndex: ChoiceIndex.optional(),
+  correctOrder: Order.optional(),
   distribution: z.array(Count),
   you: z.object({ points: Score, score: Score }).optional(),
 };
@@ -42,8 +57,9 @@ const Stage = z.discriminatedUnion("phase", [
     question: ShownQuestion,
     answerCount: Count.optional(),
     answered: z.boolean().optional(),
-    // Le choix du capitaine, une fois l'équipe engagée.
+    // Le choix du capitaine, ou son ordre, une fois l'équipe engagée.
     teamAnswer: ChoiceIndex.optional(),
+    teamOrder: Order.optional(),
   }),
   z.object({ phase: z.literal("reveal"), question: ShownQuestion, ...Reveal }),
   z.object({ phase: z.literal("leaderboard"), ...Leaderboard }),
@@ -90,7 +106,7 @@ export const ServerMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("captain_changed"), seq: Seq, captain: Nickname }),
   z.object({ type: z.literal("player_left"), seq: Seq, playerId: PlayerId }),
   z.object({ type: z.literal("question_started"), seq: Seq, ...ShownQuestion.shape }),
-  z.object({ type: z.literal("team_answer_locked"), seq: Seq, choiceIndex: ChoiceIndex }),
+  z.object({ type: z.literal("team_answer_locked"), seq: Seq, choiceIndex: ChoiceIndex.optional(), order: Order.optional() }),
   z.object({ type: z.literal("answer_count"), seq: Seq, count: Count }),
   z.object({ type: z.literal("question_ended"), seq: Seq, questionId: QuestionId, ...Reveal }),
   z.object({ type: z.literal("leaderboard"), seq: Seq, ...Leaderboard }),
