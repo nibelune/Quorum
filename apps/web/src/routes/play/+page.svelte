@@ -27,6 +27,17 @@
     game?.view?.role === "visitor" && game.view.mode === "teams" && game.error !== "nickname_taken" ? game.view : null,
   );
 
+  // Une partie terminée n'a plus rien à reprendre : au prochain chargement, le joueur retrouve le formulaire.
+  $effect(() => {
+    if (view?.stage.phase === "ended") sessionStorage.removeItem(TOKEN_KEY);
+  });
+
+  function leave() {
+    game?.close();
+    game = null;
+    pin = "";
+  }
+
   function forgetSession(code: ErrorCode) {
     if (code === "invalid_token" || code === "game_not_found" || code === "kicked") sessionStorage.removeItem(TOKEN_KEY);
   }
@@ -144,6 +155,7 @@
       <h1>Podium</h1>
       <Standings standings={stage.podium} highlight={view.team.name} />
       <p class="score">Merci d'avoir joué !</p>
+      <button class="primary again" onclick={leave}>Rejoindre une autre partie</button>
     {/if}
 
     {#if game?.error}<p class="error" role="alert">{errorMessage(game.error)}</p>{/if}
@@ -349,6 +361,11 @@
 
   .error {
     text-align: center;
+  }
+
+  .again {
+    align-self: center;
+    padding: 0.9rem 2rem;
   }
 
   .banner {

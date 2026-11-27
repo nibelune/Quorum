@@ -44,4 +44,11 @@ test("un animateur et trois joueurs jouent une partie complète", async ({ brows
     await expect(host.getByRole("listitem")).toHaveText([/Alice/, /Bob/, /Chloé/]);
     await expect(chloe.getByRole("heading", { name: "Podium" })).toBeVisible();
   });
+
+  await test.step("une fois la partie finie, les joueurs peuvent en rejoindre une autre", async () => {
+    await chloe.reload();
+    await expect(chloe.getByRole("heading", { name: "Rejoindre une partie" })).toBeVisible();
+    await alice.getByRole("button", { name: "Rejoindre une autre partie" }).click();
+    await expect(alice.getByRole("heading", { name: "Rejoindre une partie" })).toBeVisible();
+  });
 });

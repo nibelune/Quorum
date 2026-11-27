@@ -1,10 +1,23 @@
-import type { ServerMessage, Stage } from "@quorum/protocol";
+import type { ServerMessage, Stage, Team, TeamId } from "@quorum/protocol";
 
 export type View = Extract<ServerMessage, { type: "snapshot" }>["view"];
+type HostPlayer = Extract<View, { role: "host" }>["players"][number];
 
 export interface ViewState {
   view: View | null;
   seq: number;
+}
+
+// Les joueurs de l'écran projeté, par équipe : chaque équipe garde ses membres dans l'ordre d'arrivée, le premier est
+// le capitaine. Une équipe sans membre n'apparaît pas.
+export function byTeam(players: HostPlayer[]): { team: Team; members: HostPlayer[] }[] {
+  const teams = new Map<TeamId, { team: Team; members: HostPlayer[] }>();
+  for (const player of players) {
+    const group = teams.get(player.team.teamId) ?? { team: player.team, members: [] };
+    group.members.push(player);
+    teams.set(player.team.teamId, group);
+  }
+  return [...teams.values()];
 }
 
 // Met à jour la vue avec un message du serveur. Un événement déjà couvert par le dernier `seq` reçu est ignoré :

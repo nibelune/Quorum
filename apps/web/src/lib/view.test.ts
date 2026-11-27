@@ -1,6 +1,6 @@
 import { PlayerId, QuestionId, type ServerMessage, type ShownQuestion, type Stage, TeamId } from "@quorum/protocol";
 import { describe, expect, test } from "vitest";
-import { reduceView, type View, type ViewState } from "./view.ts";
+import { byTeam, reduceView, type View, type ViewState } from "./view.ts";
 
 const alice = PlayerId.parse(crypto.randomUUID());
 const bob = PlayerId.parse(crypto.randomUUID());
@@ -59,6 +59,22 @@ describe("animateur", () => {
     const withBob = reduceView(withAlice, joined(bob, "Bob", 3));
     expect(withBob.view).toMatchObject({ players: [{ playerId: alice, nickname: "Alice", team: reds }, { playerId: bob }] });
     expect(reduceView(withBob, { type: "player_left", seq: 4, playerId: alice }).view).toMatchObject({ players: [{ playerId: bob }] });
+  });
+
+  test("regroupe les joueurs par équipe, chacune dans l'ordre d'arrivée, et oublie une équipe vidée", () => {
+    const blues = { teamId: TeamId.parse(crypto.randomUUID()), name: "Bleus" };
+    const carol = PlayerId.parse(crypto.randomUUID());
+    let state = at(host);
+    for (const message of [joined(alice, "Alice", 2), { ...joined(carol, "Carol", 3), team: blues }, joined(bob, "Bob", 4)]) {
+      state = reduceView(state, message);
+    }
+    const playersOf = ({ view }: ViewState) => (view?.role === "host" ? view.players : []);
+    expect(byTeam(playersOf(state)).map(({ team, members }) => [team.name, members.map(({ nickname }) => nickname)])).toEqual([
+      ["Rouges", ["Alice", "Bob"]],
+      ["Bleus", ["Carol"]],
+    ]);
+    const withoutCarol = reduceView(state, { type: "player_left", seq: 5, playerId: carol });
+    expect(byTeam(playersOf(withoutCarol)).map(({ team }) => team.name)).toEqual(["Rouges"]);
   });
 
   test("suit le nombre de réponses pendant une question", () => {

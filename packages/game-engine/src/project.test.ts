@@ -1,4 +1,4 @@
-import type { PlayerId, TeamId } from "@quorum/protocol";
+import type { PlayerId, ServerMessage, TeamId } from "@quorum/protocol";
 import { describe, expect, test } from "vitest";
 import { project, type Recipient, snapshot } from "./project.ts";
 import type { GameEvent } from "./state.ts";
@@ -23,6 +23,7 @@ import {
 const toHost: Recipient = { role: "host" };
 const toVisitor: Recipient = { role: "visitor" };
 const toPlayer = (playerId: PlayerId, teamId: TeamId = soloTeam(playerId)): Recipient => ({ role: "player", playerId, teamId });
+const viewOf = (message: ServerMessage) => (message.type === "snapshot" ? message.view : message);
 
 describe("project", () => {
   test.each<GameEvent>([
@@ -168,9 +169,10 @@ describe("snapshot", () => {
         { teamId: red, name: "Rouges" },
         { teamId: blue, name: "Bleus" },
       ];
+      // Le visiteur ne reçoit que de quoi choisir son équipe : ni joueurs, ni question.
       const view = { role: "visitor", mode: "teams", teams };
-      expect(snapshot(playTeams(...teamLobby).state, toVisitor)).toMatchObject({ type: "snapshot", view: { ...view, canCreateTeam: true } });
-      expect(snapshot(playTeams(...teamLobby, host("start")).state, toVisitor)).toMatchObject({ view: { ...view, canCreateTeam: false } });
+      expect(viewOf(snapshot(playTeams(...teamLobby).state, toVisitor))).toEqual({ ...view, canCreateTeam: true });
+      expect(viewOf(snapshot(playTeams(...teamLobby, host("start")).state, toVisitor))).toEqual({ ...view, canCreateTeam: false });
     });
 
     test("regroupe les joueurs par équipe pour l'animateur, chacune dans l'ordre d'arrivée", () => {
@@ -189,7 +191,7 @@ describe("snapshot", () => {
   });
 
   test("en solo, ne donne au visiteur aucune équipe à choisir", () => {
-    expect(snapshot(play(...lobby).state, toVisitor)).toMatchObject({ view: { role: "visitor", mode: "solo", teams: [], canCreateTeam: false } });
+    expect(viewOf(snapshot(play(...lobby).state, toVisitor))).toEqual({ role: "visitor", mode: "solo", teams: [], canCreateTeam: false });
   });
 });
 

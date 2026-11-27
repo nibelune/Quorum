@@ -44,8 +44,12 @@ function connect(token?: string, onFirstOpen?: (client: Client) => void): Client
     socket.on("message", (data) => {
       if (!Buffer.isBuffer(data)) return;
       const message = ServerMessage.parse(JSON.parse(data.toString()));
-      if (message.type === "welcome") token = message.token;
       if ("seq" in message) lastSeq = message.seq;
+      // Comme le web : le joueur accepté change d'identité et repart du snapshot qui suit.
+      if (message.type === "welcome") {
+        token = message.token;
+        lastSeq = undefined;
+      }
       if (message.type === "answer_received" || message.type === "question_ended") pendingAnswer = undefined;
       inbox.push(message);
     });

@@ -7,6 +7,7 @@
   import Standings from "$lib/Standings.svelte";
   import { api } from "$lib/api";
   import { GameConnection } from "$lib/game.svelte";
+  import { byTeam } from "$lib/view";
   import { errorMessage } from "$lib/messages";
   import { type ClientMessage, HostToken, type PlayerId } from "@quorum/protocol";
   import { toString as qrSvg } from "qrcode";
@@ -40,8 +41,7 @@
     send({ type: "kick", playerId });
   }
 
-  // Les joueurs par équipe (un nom est unique dans la partie), chacune dans l'ordre d'arrivée : le premier est le capitaine.
-  const teams = $derived(Map.groupBy(view?.players ?? [], ({ team }) => team.name));
+  const teams = $derived(byTeam(view?.players ?? []));
 
   const plural = (count: number, word: string) => `${String(count)} ${word}${count > 1 ? "s" : ""}`;
 
@@ -89,10 +89,10 @@
             </li>
           {/snippet}
           {#if view.mode === "teams"}
-            <h2>{plural(teams.size, "équipe")} · {plural(view.players.length, "joueur")}</h2>
-            {#each [...teams] as [name, members] (name)}
-              <section class="team" aria-label={name}>
-                <h3>{name}</h3>
+            <h2>{plural(teams.length, "équipe")} · {plural(view.players.length, "joueur")}</h2>
+            {#each teams as { team, members } (team.teamId)}
+              <section class="team" aria-label={team.name}>
+                <h3>{team.name}</h3>
                 <ul>
                   {#each members as player, index (player.playerId)}
                     {@render chip(player, index === 0)}
@@ -128,7 +128,7 @@
           </header>
           <footer>
             {#if stage.phase === "question"}
-              <p>{stage.answerCount ?? 0} / {teams.size} {view.mode === "teams" ? "équipes ont répondu" : "réponses"}</p>
+              <p>{stage.answerCount ?? 0} / {teams.length} {view.mode === "teams" ? "équipes ont répondu" : "réponses"}</p>
               <button
                 disabled={game?.status !== "open"}
                 onclick={() => {

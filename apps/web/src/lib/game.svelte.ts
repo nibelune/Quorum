@@ -3,11 +3,15 @@ import { clockOffset, offsetSample } from "./clock.ts";
 import { reduceView, type View } from "./view.ts";
 
 const CLOCK_SAMPLES = 5;
+// Pendant un déploiement, web et realtime peuvent un temps ne pas avoir la même version du protocole :
+// on ne recharge la page qu'une fois par minute, pour ne pas boucler.
+const RELOAD_KEY = "quorum:reloaded-at";
+const RELOAD_INTERVAL_MS = 60_000;
 
 interface Options {
   token?: string | undefined;
   onOpen?: (game: GameConnection) => void;
-  // Après `lookup`, la vue de visiteur dit au joueur s'il doit choisir une équipe avant de rejoindre.
+  // À chaque snapshot, avant la mise à jour de `view` : vue de visiteur après `lookup`, puis de joueur ou d'animateur.
   onSnapshot?: (game: GameConnection, view: View) => void;
   onWelcome?: (token: string) => void;
   onError?: (code: ErrorCode) => void;
@@ -87,7 +91,10 @@ export class GameConnection {
     const parsed = ServerMessage.safeParse(typeof data === "string" ? JSON.parse(data) : null);
     if (!parsed.success) return;
     const message = parsed.data;
-    if (message.type === "reload") location.reload();
+    if (message.type === "reload" && Date.now() - Number(sessionStorage.getItem(RELOAD_KEY)) > RELOAD_INTERVAL_MS) {
+      sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+      location.reload();
+    }
     if (message.type === "welcome") {
       this.#token = message.token;
       this.#options.onWelcome?.(message.token);

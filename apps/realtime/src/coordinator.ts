@@ -127,10 +127,10 @@ async function coordinate(
   if (state.current.phase !== coordination.state.current.phase) game.log.info({ phase: state.current.phase }, "transition");
   coordination.state = state;
   if (game.coordination === coordination) scheduleTicks(node, game, coordination);
-  // Un seul aller-retour vers Redis pour toutes les réponses du lot.
+  // Un seul aller-retour vers Redis pour toutes les réponses du lot. `exec` ne rejette pas : chaque commande rend son erreur.
   const pipeline = node.deps.redis.pipeline();
   for (const { nodeId, connId, result } of replies) pipeline.publish(`node:${nodeId}:replies`, JSON.stringify({ connId, result }));
-  await pipeline.exec();
+  for (const [error] of (await pipeline.exec()) ?? []) if (error) throw error;
 }
 
 async function commit(node: Node, game: LocalGame, lease: string, state: GameState, events: GameEvent[], lastId: string): Promise<void> {
